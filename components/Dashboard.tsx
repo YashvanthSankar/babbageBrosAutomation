@@ -64,7 +64,6 @@ export default function Dashboard() {
 
   const user = session.user;
   const roleLabel = data?.role === "admin" ? "Professor / Admin" : data?.role === "student" ? "Student" : "Signed in";
-  const hasCalendar = Boolean(session.user.hasCalendar);
 
   return (
     <div className="app-shell">
@@ -85,15 +84,6 @@ export default function Dashboard() {
               <span className="dot" aria-hidden />
               {roleLabel}
             </span>
-            {data?.role === "admin" ? (
-              <span
-                className={`badge ${hasCalendar ? "badge-ok" : "badge-warn"}`}
-                title="Google Calendar connection status"
-              >
-                <span className="dot" aria-hidden />
-                {hasCalendar ? "Calendar connected" : "Calendar not connected"}
-              </span>
-            ) : null}
             <div className="user-chip" title={user?.email ?? undefined}>
               {user?.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -173,14 +163,25 @@ export default function Dashboard() {
 function Landing() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanEmail = email.trim();
-    if (!cleanEmail || !password) {
-      setError("Enter both an email address and a password.");
+    const normalizedPhone = phone.trim();
+    if (!cleanEmail.endsWith("@iiitdm.ac.in")) {
+      setError("Use your @iiitdm.ac.in email address.");
+      return;
+    }
+    if (!name.trim() || !password || !normalizedPhone) {
+      setError("Enter your name, institute email, phone number, and password.");
+      return;
+    }
+    if (!/^\\+91[6-9]\\d{9}$/.test(normalizedPhone)) {
+      setError("Use an Indian phone number in E.164 format, for example +919876543210.");
       return;
     }
     setPending(true);
@@ -191,6 +192,8 @@ function Landing() {
       const result = await signIn("demo-credentials", {
         email: cleanEmail,
         password,
+        name: name.trim(),
+        phone: normalizedPhone,
         redirect: false,
       });
       if (!result) {
@@ -244,7 +247,7 @@ function Landing() {
               <p className="hero-lead">
                 One dashboard for the professor to import rosters, attendance, and marks — and for
                 each student to see their own attendance, scores, recovery plan, and book an
-                advising slot. Sign in with email and password: the server decides whether you are
+                appointment slot. Sign in with your institute email and password: the server decides whether you are
                 the professor/admin or a student, so there is no role toggle to mis-set.
               </p>
 
@@ -298,8 +301,25 @@ function Landing() {
 
               <form className="auth-form" onSubmit={handleSubmit} noValidate>
                 <div className="field">
+                  <label className="field-label" htmlFor="demo-name">
+                    Full name
+                  </label>
+                  <input
+                    id="demo-name"
+                    className="input"
+                    type="text"
+                    name="name"
+                    autoComplete="name"
+                    placeholder="Your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={pending}
+                    required
+                  />
+                </div>
+                <div className="field">
                   <label className="field-label" htmlFor="demo-email">
-                    Email
+                    Institute email
                   </label>
                   <input
                     id="demo-email"
@@ -313,6 +333,26 @@ function Landing() {
                     disabled={pending}
                     required
                   />
+                  <span className="field-hint">Only @iiitdm.ac.in addresses are accepted.</span>
+                </div>
+                <div className="field">
+                  <label className="field-label" htmlFor="demo-phone">
+                    Phone number
+                  </label>
+                  <input
+                    id="demo-phone"
+                    className="input"
+                    type="tel"
+                    name="phone"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    placeholder="+919876543210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={pending}
+                    required
+                  />
+                  <span className="field-hint">Use +91 followed by a 10-digit mobile number.</span>
                 </div>
                 <div className="field">
                   <label className="field-label" htmlFor="demo-password">
@@ -347,26 +387,24 @@ function Landing() {
 
               <hr className="divider" style={{ margin: "18px 0" }} />
 
-              <div className="card-title">Professor calendar</div>
+              <div className="card-title">Appointment scheduling</div>
               <p className="small muted" style={{ marginTop: 6 }}>
-                Google Calendar is a separate, professor-only OAuth consent. Sign in first, then use{" "}
-                <strong>Connect Google Calendar</strong> on the professor dashboard. Students are
-                never asked for calendar access, and booking never pretends the calendar is
-                connected when it isn’t.
+                Choose an available appointment slot after signing in. Each confirmed appointment is
+                recorded against the selected subject and protected from double booking.
               </p>
 
               <div className="mini-table">
                 <div className="mini-row">
                   <span>
                     <strong>Professor</strong>
-                    <div className="small muted">Roster, imports, risk table, Calendar</div>
+                    <div className="small muted">Roster, imports, risk table, appointments</div>
                   </span>
                   <span className="badge badge-accent">Admin</span>
                 </div>
                 <div className="mini-row">
                   <span>
                     <strong>Student</strong>
-                    <div className="small muted">Attendance, marks, booking</div>
+                    <div className="small muted">Attendance, marks, appointments</div>
                   </span>
                   <span className="badge badge-ok">Roster</span>
                 </div>
@@ -379,8 +417,8 @@ function Landing() {
       <footer className="footer">
         <div className="container">
           Demo sign-in accepts any nonempty password and shows synthetic records only. The server
-          assigns the role from the account email; professor Google Calendar access is a separate
-          consent.
+          assigns the role from the account email. Appointment slots are shown only when returned by
+          the service.
         </div>
       </footer>
     </div>

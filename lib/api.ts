@@ -6,12 +6,8 @@
  * Errors always use: `{ error: { code, message, details? } }`.
  */
 import { NextResponse } from 'next/server';
+import { ZodError } from 'zod';
 import { DbNotConfiguredError } from './db';
-import {
-  CalendarApiError,
-  CalendarAuthError,
-  CalendarNotConfiguredError,
-} from './google-calendar';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -46,17 +42,11 @@ export function toErrorResponse(error: unknown): NextResponse {
   if (error instanceof ApiError) {
     return errorResponse(error.status, error.code, error.message, error.details);
   }
+  if (error instanceof ZodError) {
+    return errorResponse(422, 'VALIDATION_ERROR', 'Please correct the highlighted fields.', error.flatten());
+  }
   if (error instanceof DbNotConfiguredError) {
     return errorResponse(503, 'DB_NOT_CONFIGURED', error.message);
-  }
-  if (error instanceof CalendarNotConfiguredError) {
-    return errorResponse(503, 'CALENDAR_NOT_CONFIGURED', error.message);
-  }
-  if (error instanceof CalendarAuthError) {
-    return errorResponse(503, 'CALENDAR_AUTH_REQUIRED', error.message);
-  }
-  if (error instanceof CalendarApiError) {
-    return errorResponse(502, 'CALENDAR_API_ERROR', error.message);
   }
   console.error('[api] unhandled error', error);
   return errorResponse(500, 'INTERNAL_ERROR', 'Unexpected server error.');

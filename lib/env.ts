@@ -33,15 +33,6 @@ export function isDbConfigured(): boolean {
   return Boolean(clean(process.env.DATABASE_URL));
 }
 
-export function isGoogleConfigured(): boolean {
-  return Boolean(clean(process.env.GOOGLE_CLIENT_ID) && clean(process.env.GOOGLE_CLIENT_SECRET));
-}
-
-/** Calendar capability needs a Google OAuth client; a refresh token is checked separately. */
-export function isCalendarConfigured(): boolean {
-  return isGoogleConfigured();
-}
-
 export function getCalendarTimeZone(): string {
   return clean(process.env.CALENDAR_TIMEZONE) || 'Asia/Kolkata';
 }

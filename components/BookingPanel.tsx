@@ -109,9 +109,9 @@ export default function BookingPanel({
   return (
     <Card padded={false}>
       <CardHeader
-        title="Book an advising slot"
-        subtitle="Availability comes from the professor’s Google Calendar when connected; otherwise it reflects local demo bookings only. Slots are 20–30 minutes."
-        actions={<Badge tone="accent">/api/calendar</Badge>}
+        title="Book an appointment"
+        subtitle="Choose a subject, date, and an available appointment slot. Reservations are rechecked before confirmation."
+        actions={<Badge tone="accent">Appointments</Badge>}
       />
       <div className="card-body stack" style={{ gap: 16 }}>
         {subjects.length === 0 ? (
@@ -168,7 +168,7 @@ export default function BookingPanel({
                 type="button"
               >
                 {loading ? <Spinner /> : null}
-                {loading ? "Checking…" : "Check availability"}
+                {loading ? "Loading…" : "View appointment slots"}
               </button>
               {slots && slots.length > 0 ? (
                 <span className="small muted">
@@ -181,7 +181,7 @@ export default function BookingPanel({
             {loading ? (
               <div className="loading-panel" style={{ padding: "20px 0" }}>
                 <Spinner />
-                <span className="small">Querying the professor’s calendar…</span>
+                <span className="small">Loading appointment slots…</span>
               </div>
             ) : null}
 
@@ -189,8 +189,8 @@ export default function BookingPanel({
               <Alert tone="error" title="Availability unavailable">
                 <p>{slotsError}</p>
                 <p className="small" style={{ marginTop: 6 }}>
-                  If Google Calendar is not connected for the professor, no slots can be shown. This
-                  is reported honestly rather than faked.
+                  No appointment slots could be returned for this request. Try another date or
+                  contact the professor.
                 </p>
                 <div className="row" style={{ marginTop: 10 }}>
                   <button className="btn btn-sm" onClick={loadSlots} type="button">
@@ -203,12 +203,10 @@ export default function BookingPanel({
             {calendarMeta && !loading ? (
               <Alert
                 tone={calendarMeta.connected ? "info" : "warn"}
-                title={calendarMeta.connected ? "Google Calendar connected" : "Limited availability"}
+                title={calendarMeta.connected ? "Appointment availability" : "Limited availability"}
               >
                 {calendarMeta.warning ??
-                  (calendarMeta.connected
-                    ? "Availability reflects the professor’s live Google Calendar."
-                    : "The professor has not connected Google Calendar, so availability is based only on bookings made in this app.")}
+                  "Availability is based on the appointment service and existing reservations."}
               </Alert>
             ) : null}
 

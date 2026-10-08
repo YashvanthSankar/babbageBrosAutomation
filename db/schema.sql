@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS students (
     email           TEXT        NOT NULL,
     phone           TEXT,
     professor_email TEXT        NOT NULL,
+    active          BOOLEAN     NOT NULL DEFAULT true,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT students_email_lowercase CHECK (email = lower(email)),
@@ -29,6 +30,9 @@ CREATE TABLE IF NOT EXISTS students (
     CONSTRAINT students_roll_no_unique UNIQUE (roll_no),
     CONSTRAINT students_email_unique UNIQUE (email)
 );
+
+-- Idempotent upgrade for databases created before the ingestion integration.
+ALTER TABLE students ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
 
 CREATE INDEX IF NOT EXISTS students_professor_email_idx ON students (professor_email);
 
@@ -41,12 +45,45 @@ CREATE TABLE IF NOT EXISTS subjects (
     code            TEXT        NOT NULL,
     professor_email TEXT        NOT NULL,
     department      TEXT,
+    threshold       INTEGER     NOT NULL DEFAULT 85,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT subjects_code_unique UNIQUE (professor_email, code)
+    CONSTRAINT subjects_code_unique UNIQUE (professor_email, code),
+    CONSTRAINT subjects_threshold_range CHECK (threshold >= 1 AND threshold <= 99)
 );
 
+-- Idempotent upgrade for databases created before the ingestion integration.
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS threshold INTEGER NOT NULL DEFAULT 85;
+
 CREATE INDEX IF NOT EXISTS subjects_professor_email_idx ON subjects (professor_email);
+
+-- ---------------------------------------------------------------------------
+-- import_batches (ingestion)
+-- Staged, single-use previews created by the import endpoints. The normalized
+-- payload and validation report are stored as JSONB; the original workbook
+-- binary is never persisted. A batch expires 30 minutes after creation and can
+-- be confirmed exactly once.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS import_batches (
+    id                SERIAL PRIMARY KEY,
+    professor_email   TEXT        NOT NULL,
+    subject_id        INTEGER     REFERENCES subjects (id) ON DELETE SET NULL,
+    type              TEXT        NOT NULL,
+    filename          TEXT        NOT NULL,
+    checksum          TEXT        NOT NULL,
+    status            TEXT        NOT NULL DEFAULT 'pending',
+    parsed_payload    JSONB       NOT NULL,
+    validation_report JSONB       NOT NULL,
+    expires_at        TIMESTAMPTZ NOT NULL,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    confirmed_at      TIMESTAMPTZ,
+    CONSTRAINT import_batches_type_valid CHECK (type IN ('roster', 'attendance', 'marks')),
+    CONSTRAINT import_batches_status_valid CHECK (status IN ('pending', 'processing', 'confirmed', 'expired')),
+    CONSTRAINT import_batches_professor_email_lowercase CHECK (professor_email = lower(professor_email))
+);
+
+CREATE INDEX IF NOT EXISTS import_batches_professor_status_idx
+    ON import_batches (professor_email, status);
 
 -- ---------------------------------------------------------------------------
 -- attendance_records

@@ -6,7 +6,6 @@ declare module 'next-auth' {
       id: string;
       role: 'admin' | 'student';
       studentId: number | null;
-      hasCalendar: boolean;
     } & DefaultSession['user'];
   }
 
@@ -19,7 +18,5 @@ declare module 'next-auth/jwt' {
   interface JWT {
     role?: 'admin' | 'student';
     studentId?: number | null;
-    hasCalendar?: boolean;
-    provider?: string;
   }
 }

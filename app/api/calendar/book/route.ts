@@ -4,28 +4,20 @@
  * Flow (all server-side):
  *   1. derive the student from the session email mapped to the roster
  *   2. validate subject ownership and booking window
- *   3. verify Google free/busy for the requested window
- *   4. reserve the slot transactionally (advisory lock + overlap check)
- *   5. create the professor's calendar event and confirm the booking
+ *   3. reserve the local appointment slot transactionally (advisory lock +
+ *      overlap check)
  *
- * A slot is only reserved after the free/busy check; the DB transaction makes
- * double booking impossible even under concurrent requests. If the Google event
- * fails the reservation is marked `failed` so it never blocks future bookings.
+ * The DB transaction makes double booking impossible even under concurrent
+ * requests.
  */
 import type { NextRequest } from 'next/server';
 import type { NextResponse } from 'next/server';
 import { ApiError, handleRoute, json } from '@/lib/api';
 import { query, withTransaction } from '@/lib/db';
-import {
-  getCalendarTimeZone,
-  getMaxBookingMinutes,
-  getMinBookingMinutes,
-} from '@/lib/env';
-import { createCalendarEvent, isCalendarConfigured, queryFreeBusy } from '@/lib/google-calendar';
+import { getMaxBookingMinutes, getMinBookingMinutes } from '@/lib/env';
 import { findStudentByEmail, findSubjectById } from '@/lib/roster';
 import { getSession, requireSession, sessionEmail } from '@/lib/session';
-import { intervalsOverlap, minutesBetween, parseInstant } from '@/lib/time';
-import { hasProfessorRefreshToken } from '@/lib/tokens';
+import { minutesBetween, parseInstant } from '@/lib/time';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -98,34 +90,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       throw new ApiError(403, 'FORBIDDEN', 'That subject belongs to a different professor.');
     }
 
-    if (!isCalendarConfigured() || !(await hasProfessorRefreshToken(subject.professor_email))) {
-      throw new ApiError(
-        503,
-        'CALENDAR_UNAVAILABLE',
-        'The professor has not connected Google Calendar, so bookings cannot be created right now.',
-      );
-    }
-
     const startIso = start.toISOString();
     const endIso = end.toISOString();
-
-    // Server-side availability revalidation against the live calendar.
-    const googleBusy = await queryFreeBusy(subject.professor_email, startIso, endIso);
-    const calendarConflict = googleBusy.some((interval) =>
-      intervalsOverlap(
-        start.getTime(),
-        end.getTime(),
-        new Date(interval.start).getTime(),
-        new Date(interval.end).getTime(),
-      ),
-    );
-    if (calendarConflict) {
-      throw new ApiError(
-        409,
-        'SLOT_UNAVAILABLE',
-        'That time is no longer free on the professor calendar. Please choose another slot.',
-      );
-    }
 
     // Transactional reservation: serialize bookings per professor and re-check
     // local overlap inside the lock.
@@ -159,28 +125,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return inserted.rows[0];
     });
 
-    // Create the calendar event; mark the reservation failed if Google rejects it.
-    let eventId: string;
-    try {
-      const event = await createCalendarEvent(subject.professor_email, {
-        summary: `${subject.code} consultation - ${student.name}`,
-        description: `Consultation booked through the education automation portal.\nStudent: ${student.name} (${student.roll_no})\nSubject: ${subject.code} - ${subject.name}`,
-        startIso,
-        endIso,
-        timeZone: getCalendarTimeZone(),
-        attendeeEmail: student.email,
-      });
-      eventId = event.id;
-    } catch (error) {
-      await query(`UPDATE bookings SET status = 'failed', updated_at = now() WHERE id = $1`, [
-        booking.id,
-      ]);
-      throw error;
-    }
-
     await query(
-      `UPDATE bookings SET status = 'confirmed', google_event_id = $2, updated_at = now() WHERE id = $1`,
-      [booking.id, eventId],
+      `UPDATE bookings SET status = 'confirmed', updated_at = now() WHERE id = $1`,
+      [booking.id],
     );
 
     return json(
@@ -190,7 +137,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           start: new Date(booking.starts_at).toISOString(),
           end: new Date(booking.ends_at).toISOString(),
           status: 'confirmed',
-          eventId,
         },
       },
       201,

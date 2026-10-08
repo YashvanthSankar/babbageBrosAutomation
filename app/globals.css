@@ -37,41 +37,6 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #0b1020;
-    --bg-glow-a: rgba(99, 102, 241, 0.18);
-    --bg-glow-b: rgba(56, 189, 248, 0.12);
-    --surface: #131a2e;
-    --surface-2: #1a2238;
-    --surface-3: #222c47;
-    --border: #26304a;
-    --border-strong: #33405f;
-    --text: #eef1f8;
-    --text-soft: #c7cddd;
-    --muted: #9aa5bd;
-    --muted-2: #6b7690;
-    --accent: #818cf8;
-    --accent-strong: #a5b4fc;
-    --accent-soft: rgba(129, 140, 248, 0.16);
-    --accent-contrast: #0b1020;
-    --ok: #6ce9a6;
-    --ok-soft: rgba(6, 118, 71, 0.18);
-    --ok-border: rgba(108, 233, 166, 0.35);
-    --warn: #fec84b;
-    --warn-soft: rgba(181, 71, 8, 0.2);
-    --warn-border: rgba(254, 200, 75, 0.35);
-    --danger: #fda29b;
-    --danger-soft: rgba(180, 35, 24, 0.22);
-    --danger-border: rgba(253, 162, 155, 0.35);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow: 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 24px 48px -16px rgba(0, 0, 0, 0.7);
-    --ring: 0 0 0 3px rgba(129, 140, 248, 0.4);
-  }
-}
-
 *,
 *::before,
 *::after {
@@ -558,18 +523,6 @@ textarea {
   width: 100%;
 }
 
-.google-btn {
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  color: var(--text);
-  padding: 11px 18px;
-  font-size: 0.95rem;
-}
-
-.google-btn:hover {
-  background: var(--surface-2);
-}
-
 /* ---------- forms ---------- */
 .field {
   display: flex;
@@ -619,8 +572,12 @@ textarea {
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 13px;
   margin-top: 16px;
+}
+
+.hero-panel .card-title {
+  letter-spacing: -0.015em;
 }
 
 /* ---------- dropzone ---------- */

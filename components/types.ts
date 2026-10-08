@@ -73,7 +73,7 @@ export type SlotsResponse = {
   slots?: CalendarSlot[];
   date?: string;
   timeZone?: string;
-  source?: "google" | "local";
+  source?: "local";
   calendarConnected?: boolean;
   warning?: string;
   error?: ApiErrorBody;

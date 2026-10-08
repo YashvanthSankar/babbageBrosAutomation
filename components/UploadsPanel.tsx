@@ -30,7 +30,7 @@ const STEPS: {
     needsSubject: false,
     description: "Import the class roster first. Every later upload matches students by roll number.",
     columns: "studentname, rollno, phone, email",
-    hint: "Required columns exactly as above. Email must be the student’s verified Google address.",
+    hint: "Required columns exactly as above. Student email must end in @iiitdm.ac.in.",
   },
   {
     id: "attendance",

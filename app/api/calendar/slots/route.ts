@@ -3,11 +3,7 @@
  *
  * Returns 30-minute candidate slots for the requested day in the professor's
  * time zone, serialized as ISO UTC. Availability combines the professor's
- * Google free/busy with existing local bookings.
- *
- * Honest fallback: if Google is not configured or the professor has not
- * connected the calendar, `calendarConnected` is false, `source` is "local",
- * and a `warning` explains the reduced accuracy.
+ * existing local bookings. Appointment availability is managed in-app.
  */
 import type { NextRequest } from 'next/server';
 import type { NextResponse } from 'next/server';
@@ -21,11 +17,9 @@ import {
   isProfessorEmail,
   normalizeEmail,
 } from '@/lib/env';
-import { isCalendarConfigured, queryFreeBusy } from '@/lib/google-calendar';
 import { findStudentByEmail, findSubjectById } from '@/lib/roster';
 import { getSession, requireSession, sessionEmail } from '@/lib/session';
 import { dayBoundsUtc, intervalsOverlap, isValidIsoDate, zonedDateTimeToUtc } from '@/lib/time';
-import { hasProfessorRefreshToken } from '@/lib/tokens';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -92,36 +86,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       endMs: new Date(row.ends_at).getTime(),
     }));
 
-    let calendarConnected = false;
-    let source: 'google' | 'local' = 'local';
-    let warning: string | undefined;
-
-    if (isCalendarConfigured() && (await hasProfessorRefreshToken(subject.professor_email))) {
-      try {
-        const googleBusy = await queryFreeBusy(
-          subject.professor_email,
-          dayStart.toISOString(),
-          dayEnd.toISOString(),
-        );
-        for (const interval of googleBusy) {
-          const startMs = new Date(interval.start).getTime();
-          const endMs = new Date(interval.end).getTime();
-          if (Number.isFinite(startMs) && Number.isFinite(endMs)) {
-            busy.push({ startMs, endMs });
-          }
-        }
-        calendarConnected = true;
-        source = 'google';
-      } catch (error) {
-        console.error('[calendar/slots] free/busy failed; using local availability', error);
-        warning =
-          'Google Calendar could not be reached, so availability is based only on bookings made in this app.';
-      }
-    } else {
-      warning =
-        'The professor has not connected Google Calendar, so availability is based only on bookings made in this app.';
-    }
-
     const { hour: startHour, minute: startMinute } = getWorkdayStart();
     const { hour: endHour, minute: endMinute } = getWorkdayEnd();
     const step = getSlotMinutes();
@@ -152,9 +116,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       slots,
       date,
       timeZone,
-      source,
-      calendarConnected,
-      ...(warning ? { warning } : {}),
+      source: 'local',
+      calendarConnected: false,
+      warning: 'Availability is managed through appointment slots in this app.',
     });
   });
 }

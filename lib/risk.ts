@@ -1,11 +1,21 @@
 /**
  * Attendance / marks risk calculation.
  *
- * The rules are fixed by docs/architecture.md and are computed, not AI-generated:
- *   attendancePercent = attended / total * 100            (0 classes => no data, not 0%)
- *   classesToRecover  = max(0, ceil((0.85 * total - attended) / 0.15))
- *   atRisk            = attendancePercent !== null && attendancePercent < 85
- *   warn              = 85 <= attendancePercent < 90
+ * This module merges two contracts:
+ *
+ * 1. The dashboard contract (docs/architecture.md, used by lib/dashboard.ts and
+ *    the professor/student UI). Thresholds are fixed at 85/90:
+ *      attendancePercent = attended / total * 100   (0 classes => no data, not 0%)
+ *      classesToRecover  = max(0, ceil((0.85 * total - attended) / 0.15))
+ *      atRisk            = attendancePercent !== null && attendancePercent < 85
+ *      warn              = 85 <= attendancePercent < 90
+ *
+ * 2. The ingestion contract (ported from the `upload` branch) with a
+ *    per-subject configurable threshold and the AT_RISK/WATCH/SAFE/NO_DATA
+ *    status vocabulary used by the imported-API docs.
+ *
+ * Both live here so the dashboard keeps its existing shape while the imported
+ * risk helpers (and their unit tests) remain available.
  */
 
 export const ATTENDANCE_RISK_THRESHOLD = 85;
@@ -123,4 +133,46 @@ export function overallRisk(levels: readonly RiskLevel[]): RiskLevel {
     return 'ok';
   }
   return worst;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Ingestion contract (ported from origin/upload lib/risk.ts)
+ * ------------------------------------------------------------------------- */
+
+export type RiskStatus = 'AT_RISK' | 'WATCH' | 'SAFE' | 'NO_DATA';
+
+export function attendancePercentage(present: number, recorded: number): number | null {
+  if (recorded <= 0) return null;
+  return (present / recorded) * 100;
+}
+
+export function recoveryClasses(present: number, recorded: number, thresholdPercent: number): number {
+  if (recorded <= 0) return 0;
+  const threshold = thresholdPercent / 100;
+  if (present / recorded >= threshold) return 0;
+  return Math.max(0, Math.ceil((threshold * recorded - present) / (1 - threshold)));
+}
+
+export function riskStatus(percentage: number | null, threshold: number): RiskStatus {
+  if (percentage === null) return 'NO_DATA';
+  if (percentage < threshold) return 'AT_RISK';
+  if (percentage < threshold + 5) return 'WATCH';
+  return 'SAFE';
+}
+
+const STATUS_RANK: Record<RiskStatus, number> = { AT_RISK: 0, WATCH: 1, SAFE: 2, NO_DATA: 3 };
+
+export function compareRisk(
+  left: { status: RiskStatus; percentage: number | null; recoveryClasses: number; name: string },
+  right: { status: RiskStatus; percentage: number | null; recoveryClasses: number; name: string },
+): number {
+  const statusDifference = STATUS_RANK[left.status] - STATUS_RANK[right.status];
+  if (statusDifference) return statusDifference;
+  if (left.status === 'AT_RISK') {
+    const percentageDifference = (left.percentage ?? 101) - (right.percentage ?? 101);
+    if (percentageDifference) return percentageDifference;
+    const recoveryDifference = right.recoveryClasses - left.recoveryClasses;
+    if (recoveryDifference) return recoveryDifference;
+  }
+  return left.name.localeCompare(right.name);
 }
