@@ -9,8 +9,13 @@
 | Try it | Link |
 |---|---|
 | **Live application** | [https://automation.zapdos.me](https://automation.zapdos.me) |
-| **Demo video (Google Drive folder)** | [Open the demo video folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
+| **Watch the demo (92 seconds)** | [Play or download the MP4 from this repository](media/student-success-demo.mp4) |
+| Earlier shared folder | [Google Drive demo folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
 | Source | [GitHub repository](https://github.com/YashvanthSankar/babbageBrosAutomation) |
+
+[![Watch the Student Success demo video: records to risk to support](media/student-success-demo-poster.jpg)](media/student-success-demo.mp4)
+
+**[▶ Watch / download the demo video](media/student-success-demo.mp4)** · 1080p · 1 minute 32 seconds · narrated product tour. The public landing page is a real capture; authenticated dashboard screens show the real interface with **synthetic, intercepted data**, not a live student record or a completed provider send. Hosted weekly automation and Google Calendar remain unverified end to end. See [the verification audit](docs/progress/2026-10-09-integration-audit.md) for the current release boundary.
 
 ## The problem we chose to solve
 

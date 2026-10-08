@@ -21,3 +21,7 @@ yarn-debug.log*
 
 # Local conversation/export file (may contain sensitive context)
 /rt
+
+# Local editable video project and generated HyperFrames caches. Publish only the
+# reviewed MP4 and poster in /media; keep captures and working files on this machine.
+/videos/student-success-demo/
