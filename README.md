@@ -23,8 +23,22 @@
 - **A working faculty-to-student product, not just an automation diagram.** Faculty can define subjects and thresholds, import records and investigate risk; students can see their own progress and reserve a consultation. The demo is public, but its password-only identity check is **not suitable for real student data**.
 - **Correctable academic records.** CSV/XLSX ingestion validates roster identities and class dates, explains row errors, and commits staged batches atomically. Re-imports correct existing attendance and marks instead of double-counting them.
 - **Risk with an explanation and a next step.** Attendance shortfalls produce a precise consecutive-classes-to-recover count; normalized assessments expose weak and falling scores. The dashboard connects the signal to a bookable slot.
-- **Accountable, guarded automation.** Post-import email/call activity and weekly cohort/adviser jobs use durable deduplication claims and visible status. Public email/calls are simulated; optional live tests use only consenting, server-pinned destinations. A weekly cron schedule and external delivery are **not verified**.
+- **Accountable, guarded automation.** Post-import email/call activity and weekly cohort/adviser jobs use durable deduplication claims and visible status. The team reports working Resend email and OmniDimension call demos; the public demo still simulates by default, and optional live tests are limited to consenting, server-pinned destinations. We have not independently inspected provider receipts, and a weekly cron schedule is **not verified**.
 - **An optional Calendar bridge.** The code supports professor-consented FreeBusy and Google event creation. The two redacted demo screenshots below show a confirmed in-app booking and a matching Google Calendar event; they do **not** establish an independently reproduced hosted OAuth/availability test.
+
+### Why this is a strong hackathon entry
+
+We did not stop at “when a spreadsheet arrives, send an email.” We built the **student-success workflow around the automation**: who owns each record, what a correction means, why a student is at risk, whether an intervention was already attempted, and how the student can book help. That is the part a connector alone does not decide.
+
+| What a judge can ask | What we built to answer it |
+|---|---|
+| “The professor corrected yesterday’s attendance. Does the system count another class?” | No: imports match student, subject and class date, then update the existing record in an atomic confirmation. An invalid batch applies nothing. |
+| “Why was this student flagged, and can they recover?” | Show the actual attendance and assessment inputs, the subject threshold and the minimum consecutive classes needed. For example, **16/20 at an 85% target needs 7 more attended classes**. |
+| “What if the same job runs twice, or two students choose the same slot?” | Durable Convex claims prevent repeat automation attempts for the same key; a Convex reservation rejects overlapping local bookings. These paths have isolated transaction tests, not a claimed production concurrency benchmark. |
+| “Is there a real next step after the alert?” | A student-facing view and consultation booking flow, with a separately supplied in-app confirmation and matching Google Calendar screenshot below. The screenshots are evidence of that demo moment, not proof of every OAuth/FreeBusy path. |
+| “Will the public demo contact real students?” | No: email and voice simulate by default; optional live tests require explicit opt-in and consenting server-pinned recipients, with fixed synthetic content. |
+
+**The honest advantage over a Zapier/n8n/Make-only submission:** those platforms are good at connecting services, and we could use them at the edges. Our differentiator is an **inspectable domain product**—transactional academic records, explainable decisions, role-scoped views, at-most-once intervention claims and booking—rather than a chain of triggers that still needs an application and durable state to answer the questions above. This is a design argument, **not** a claim that we benchmarked or universally outperformed those platforms. See the [stack and trade-offs](#the-architecture-one-source-of-truth-explicit-side-effects) and [decision record](docs/workflow-choice.md).
 
 ### Booking → Calendar: demo screenshots
 
@@ -54,12 +68,13 @@ The interesting part is not calling an email API. It is deciding **which record 
 
 ### For faculty
 
-- Create a subject and set attendance and marks thresholds.
-- Import the roster first, then attendance and marks. Dashboard imports return row-level validation errors before applying records; the server also exposes staged preview/confirm APIs.
+- Create a subject and set attendance and marks thresholds; filter and page through students by subject, department and risk.
+- Import the roster first, then attendance and marks. Dashboard imports return row-level validation errors before applying records; the server also exposes staged preview/confirm APIs and downloadable templates.
 - Upload CSV for each record type; roster, attendance, and marks also accept Excel. Excel marks require a test name, date, and maximum score.
 - See students ordered by risk, with attendance, recovery classes, latest marks, and score movement together.
-- Review deduplicated post-import email/call activity; public mode is simulated, while optional live tests are pinned to consenting test contacts.
+- Review deduplicated post-import email/call activity and a once-per-UTC-day manual warning-email demo; public mode is simulated, while optional live tests are pinned to consenting test contacts.
 - Run an ISO-week-deduplicated cohort digest and conditional adviser escalation manually; optionally schedule it with authenticated VPS cron. The activity feed records aggregate counts and action status, **not confirmed inbox delivery**.
+- Optionally connect an approved Google account for Calendar-backed availability and events; the account holder must grant consent.
 
 ### For students
 
@@ -148,7 +163,7 @@ This is **not** “we replaced all connectors.” We implemented the domain-spec
 
 ## Evidence and release status (9 October 2026)
 
-**Implementation is not the same as hosted end-to-end verification.** At the [isolated integration audit](docs/progress/2026-10-09-integration-audit.md), 54 automated tests passed, including three tests executing actual Convex handlers with a disposable in-memory database; TypeScript checking and the production build also passed. At the latest read-only hosted smoke check (9 October 2026), the weekly manual route returned **401 without a session** instead of the earlier 404, so the route exists on the VPS. The cron route returned **503 without configuration**; authenticated weekly execution, an installed schedule, and provider delivery remain unverified. The smoke script never signs in, uploads data, sends mail or places calls.
+**Implementation is not the same as independently verified hosted delivery.** At the [isolated integration audit](docs/progress/2026-10-09-integration-audit.md), 54 automated tests passed, including three tests executing actual Convex handlers with a disposable in-memory database; TypeScript checking and the production build also passed. At the latest read-only hosted smoke check (9 October 2026), the weekly manual route returned **401 without a session** instead of the earlier 404, so the route exists on the VPS. The cron route returned **503 without configuration**. The team reports working Resend email and OmniDimension call demos; this audit did not inspect provider logs, an inbox or a completed call. Authenticated weekly execution and an installed schedule remain unverified. The smoke script never signs in, uploads data, sends mail or places calls.
 
 | Capability | Implementation / verification |
 |---|---|
@@ -156,8 +171,8 @@ This is **not** “we replaced all connectors.” We implemented the domain-spec
 | Attendance and marks risk | Deterministic threshold, recovery-class, weak-mark, and falling-mark calculations covered by unit and isolated cross-function tests. |
 | Professor/student dashboards | Implemented with server-side session scoping; anonymous hosted dashboard request returns 401. Authenticated hosted student isolation not re-tested; demo passwords do not establish identity. |
 | Appointment booking | Local Convex conflict and cross-professor checks passed in isolated tests. User-provided, redacted screenshots show a confirmed in-app demo booking and matching Google Calendar event for the same slot; hosted OAuth consent, FreeBusy behavior, repeatability and invitation delivery are **not independently verified end to end**. |
-| Voice | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned test number and fixed synthetic context. |
-| Email | Attendance/marks imports create deduplicated warning activity. A manual synthetic warning demo is limited to once per UTC day with a durable claim; public mode simulates. Explicitly enabled live tests go only to the server-pinned consenting inbox with fixed synthetic content. Live inbox receipt has not been verified. |
+| Voice / OmniDimension | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned consenting test number and fixed synthetic context. The team reports a working call demo; we have not independently observed the call or its provider log. |
+| Email / Resend | Attendance/marks imports create deduplicated warning activity. A manual synthetic warning demo is limited to once per UTC day with a durable claim; public mode simulates. Explicitly enabled live tests go only to the server-pinned consenting inbox with fixed synthetic content. The team reports a working email demo; we have not independently inspected inbox receipt. |
 | Weekly summary and adviser escalation | Implemented and tested locally; isolated Convex test verifies cohort counts and duplicate weekly claims. The hosted manual route now returns **401 without a session**, not 404; the cron route returns **503** because its required configuration is missing. Neither route has been verified with an authorized run. Scheduling requires `CRON_SECRET` and a monitored VPS cron entry; neither is proved installed. Adviser action requires a configured adviser email and at-risk students. Public mode simulates; optional live test delivery is pinned to a consenting test inbox. |
 | Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Home and health return 200; protected reads return 401 without a session. Route presence is not evidence that authenticated workflows succeed. |
 
