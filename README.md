@@ -12,8 +12,6 @@
 | **Demo video (Google Drive folder)** | [Open the demo video folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
 | Source | [GitHub repository](https://github.com/YashvanthSankar/babbageBrosAutomation) |
 
-> **Before submitting:** verify the live application opens over HTTPS and the Drive folder contains the final screen recording. Set the video or folder's general access to **Anyone with the link — Viewer**, then test both links in a signed-out/private browser window. At the time of the latest audit, DNS for `automation.zapdos.me` did not resolve from the audit environment, so hosting still needs external verification.
-
 ## The problem we chose to solve
 
 Attendance sheets and test scores are often reviewed separately, manually, and too late. A percentage may tell a professor that a student is struggling; it does not tell them **how serious the gap is, what changed, or what to do next**. Students may not know they are approaching a requirement until recovering becomes much harder.
@@ -29,10 +27,10 @@ The goal is not to replace a professor’s judgment. It is to make important sig
 ### For faculty
 
 - Create a subject and set attendance and marks thresholds.
-- Import the student roster first, then subject attendance and assessment results from CSV or Excel.
-- Review validated import previews before applying data. Invalid rows are explained; a failed confirmation does not partially apply a batch.
+- Import the roster first, then attendance and marks. Dashboard imports return row-level validation errors before applying records; the server also exposes staged preview/confirm APIs.
+- Upload CSV for each record type; roster and attendance also accept Excel. The dashboard marks uploader is CSV-only.
 - See students ordered by risk, with attendance, recovery classes, latest marks, and score movement together.
-- Trigger post-import warning emails and newly-below-threshold call automation when provider credentials are configured.
+- Review deduplicated post-import email/call activity; public mode is simulated, while optional live tests are pinned to consenting test contacts.
 
 ### For students
 
@@ -43,12 +41,12 @@ The goal is not to replace a professor’s judgment. It is to make important sig
 ## How the workflow works
 
 1. **Roster first.** The professor imports each student’s name, roll number, phone, and email. Later imports are matched to that roster; unknown roll numbers are reported rather than silently attached to the wrong person.
-2. **Preview before applying.** CSV and Excel inputs are validated and staged. Faculty can see errors and a sample of the parsed data before confirming. Confirmed batches are applied atomically and cannot be confirmed twice.
+2. **Validate before applying.** Dashboard uploads show row-level errors and do not apply invalid batches. Dedicated preview/confirm endpoints are also available for staged import clients; confirmed batches are atomic and cannot be confirmed twice.
 3. **Calculate risk from the records.** Attendance and marks are normalized per student and subject. The dashboard puts the most urgent cases first and shows the facts behind each flag.
-4. **Act after a successful import.** The server can send grounded warning emails after attendance or marks imports. When an attendance import causes a student to newly cross below the attendance threshold, it can request an automated call. Notification claims prevent duplicate dispatches for the same risk snapshot.
+4. **Act after a successful import.** Imports create visible notification activity. In public demo mode, email and call outcomes are honestly marked simulated. With explicit VPS opt-in, a test email/call goes only to a consenting, server-pinned test recipient and uses fixed synthetic content—never uploaded student contact or academic data.
 5. **Offer a way forward.** Students can reserve a professor appointment. Reservations are collision-checked; when the professor has connected Google Calendar, availability and event creation can use that calendar.
 
-Provider calls happen on the server **after** the data is safely committed. A failed email or call is recorded as an integration failure; it does not undo the professor’s valid import. Opening or refreshing a dashboard does not itself trigger calls or emails.
+Provider calls happen on the server **after** the data is safely committed. A failed email or call is recorded as an integration failure; it does not undo the professor’s valid import. Opening or refreshing a dashboard does not itself trigger calls or emails. Live demo messages/calls go only to server-pinned test contacts with fixed synthetic content; they are not personal messages to uploaded students. An event marked simulated is not a delivered email or call.
 
 ## Explainable risk, not a black box
 
@@ -71,11 +69,11 @@ Marks are compared as percentages, so results with different maximum scores can 
 
 Zapier and n8n are useful tools, and they are excellent for connecting existing services. This problem also needs a **trusted product around the automation**:
 
-- **The data has to be right before action is taken.** Roster matching, date-column attendance sheets, marks validation, preview, correction, and atomic confirmation are domain rules—not just steps between two APIs.
+- **The data has to be right before action is taken.** Roster matching, date-column attendance sheets, marks validation, correction, and atomic confirmation are domain rules—not just steps between two APIs.
 - **The calculation must be inspectable.** The same subject-level records power the risk table, recovery count, student view, and notification facts. There is one calculation to audit instead of separate copies hidden in workflow nodes.
-- **The user’s identity controls the data.** Faculty operations are separated from student views; student requests resolve to the signed-in roster record on the server.
+- **The application scopes data by session.** Faculty operations are separated from student views; student requests resolve records from the signed-in email on the server. Demo credentials are not identity verification (see the security note below).
 - **Automation must be safe to retry.** Imports, notification claims, and bookings have explicit uniqueness or collision checks, so retries are not treated as new evidence or a new appointment.
-- **People need a usable interface.** A professor previews a sheet and sees why a row is rejected; a student sees a personal explanation and a next step. Neither audience should have to inspect an automation editor.
+- **People need a usable interface.** A professor sees row-level upload errors and a clear risk explanation; a student sees a personal explanation and a next step. Neither audience should have to inspect an automation editor.
 
 We chose application code for the rules, permissions, and student/faculty experience, while using dedicated services where they fit: Convex for shared persistence, Resend for email delivery, OmniDimension for voice, and Google Calendar when professor authorization is configured. This keeps the critical decisions close to the data and makes each step testable.
 
@@ -85,14 +83,14 @@ We want the demo to be credible, so we distinguish working application behavior 
 
 | Capability | Implementation / verification |
 |---|---|
-| Roster, attendance, and marks imports | CSV and Excel parsing, validation, staged previews, atomic confirmation, templates, and repeat-import handling are implemented. |
+| Roster, attendance, and marks imports | Dashboard CSV imports are implemented (roster/attendance also accept Excel; marks dashboard upload is CSV-only). Validation, atomic writes, templates, repeat-import handling, and separate staged preview/confirm APIs are available. |
 | Attendance and marks risk | Deterministic threshold, recovery-class, weak-mark, and falling-mark calculations are implemented and covered by tests. |
 | Professor/student dashboards | Implemented with server-side role and student-record scoping. |
 | Appointment booking | In-app reservations and collision rejection were tested. Google Calendar synchronization is optional and requires professor OAuth consent; do not assume it is connected in a demo. |
-| Voice | Newly-below-threshold trigger and notification deduplication are implemented. One controlled OmniDimension call returned success. That verifies the provider path, **not a complete judge-observed upload-to-call demonstration**. |
-| Email | Risk-based Resend dispatch is implemented. A test send was rejected because the sender domain was not verified/allowed; successful student delivery is not claimed until that is configured. |
+| Voice | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned test number and fixed synthetic context. |
+| Email | Attendance/marks imports create deduplicated warning activity. Public mode simulates; explicitly enabled live tests go only to the server-pinned test inbox with generic synthetic content. Live inbox receipt is not yet verified. |
 | Weekly summary | Not implemented in this competition version. |
-| Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Public reachability was not verified from the audit environment. |
+| Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Hosted on the VPS. |
 
 ## A judge’s two-minute walkthrough
 
@@ -101,9 +99,9 @@ We want the demo to be credible, so we distinguish working application behavior 
 3. Open the risk-ranked student list. Pick a student below threshold and inspect the attendance arithmetic, recovery count, and marks trend.
 4. Sign out and sign in with that roster-listed student’s institute email. Confirm that only their records appear.
 5. Book an appointment and show the result. If Google Calendar is not connected, describe it accurately as an in-app reservation—not a Google event.
-6. If demonstrating a voice call, use only the approved test recipient and show the actual provider result. Do not imply an email was delivered unless it was received.
+6. Open Automations to show notification activity. Public mode marks events simulated; a provider-accepted pinned test does not prove an email was read or a call answered.
 
-Use synthetic records for judging. The competition login accepts any **non-empty demo password**; it does not verify passwords and is not production-grade authentication. The student email must be on the professor’s roster. Do not load real student contact data into this demo.
+**Demo security:** sign-in accepts any non-empty password and does not verify identity. Anyone can impersonate the configured professor or a student account. This is not production authentication or a secure store for real records. Use synthetic student names, emails, phone numbers, attendance, and marks only.
 
 ## Data formats
 
@@ -140,7 +138,7 @@ Downloadable Excel templates are available at `/api/templates/roster`, `/api/tem
 - **VPS** — hosts the web application and executes provider requests after imports.
 - **Resend, OmniDimension, Google Calendar** — external integrations, each used only when its server credentials and required account permissions are configured.
 
-The professor is identified by the exact configured `PROFESSOR_EMAIL`. Student views resolve from the signed-in email and roster, not an ID supplied by the browser. Raw phone numbers are not returned in student dashboard responses. See [the architecture](docs/architecture.md) and [VPS deployment guide](deploy/README.md).
+The professor role is determined by the exact configured `PROFESSOR_EMAIL`; student records are looked up using the signed-in email, not an ID supplied by the browser. Because demo passwords are not verified, this is session scoping—not proof of identity. Raw phone numbers are not returned in student dashboard responses. See [the architecture](docs/architecture.md) and [VPS deployment guide](deploy/README.md).
 
 ## Run and verify
 
@@ -149,6 +147,8 @@ npm ci
 cp .env.example .env.local
 # Configure the required Convex, session, and professor variables in .env.local.
 npm run dev
+# Dedicated preview on http://localhost:3001 (isolated build cache):
+npm run dev:preview
 ```
 
 Provider secrets belong only in the server environment and must never be committed. Run checks with:

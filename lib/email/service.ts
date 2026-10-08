@@ -22,13 +22,14 @@ function validEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-/** Post-import email automation. Public demos record a simulation by default.
- * Live demo mode always routes to the explicitly configured test inbox, never
- * to an arbitrary address uploaded into the public roster. */
+/** Public demos simulate by default. Live mode can only target the pinned test inbox. */
 export async function dispatchRiskEmails(professorEmail: string, subjectId?: string) {
   const live = liveDemoAutomationsEnabled();
   const testRecipient = demoEmailRecipient();
-  if (live && (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL || !validEmail(testRecipient))) {
+  if (
+    live &&
+    (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL || !validEmail(testRecipient))
+  ) {
     return {
       sent: 0,
       failed: 0,
@@ -47,26 +48,13 @@ export async function dispatchRiskEmails(professorEmail: string, subjectId?: str
   let simulated = 0;
 
   for (const target of targets) {
-    const facts = [`Hello ${target.name},`, `Your ${target.subjectName} progress needs attention.`];
-    if (target.attendancePercentage !== null) {
-      facts.push(
-        `Attendance: ${target.present}/${target.total} (${target.attendancePercentage.toFixed(1)}%). Required: ${target.threshold}%. Attend ${target.classesToRecover} consecutive classes to reach the requirement.`,
-      );
-    }
-    if (target.latestScore !== null) {
-      facts.push(
-        `Latest test: ${target.latestScore.toFixed(1)}%.${target.previousScore !== null ? ` Previous test: ${target.previousScore.toFixed(1)}%.` : ''}`,
-      );
-    }
-    facts.push('Please review your dashboard and book an advising appointment with your professor.');
-
+    // This is used only to create a stable, idempotent local simulation key.
+    // It is never included in an outbound message.
     const snapshot = createHash('sha256')
       .update(JSON.stringify([target.present, target.total, target.latestScore, target.previousScore, target.threshold]))
       .digest('hex')
       .slice(0, 20);
 
-    // One visible simulation record per student/subject/risk snapshot rather
-    // than pretending that multiple notifications were delivered.
     if (!live) {
       const key = `email-simulated:${target.studentId}:${target.subjectId}:${snapshot}`;
       const id = await integrationMutation('claimNotification', {
@@ -85,6 +73,8 @@ export async function dispatchRiskEmails(professorEmail: string, subjectId?: str
       continue;
     }
 
+    // Open demo sign-in means uploads are untrusted. Live mode therefore sends
+    // only one fixed-content test message to a server-pinned, consenting inbox.
     const key = liveDemoDailyKey('resend-live');
     const id = await integrationMutation('claimNotification', {
       professorEmail,

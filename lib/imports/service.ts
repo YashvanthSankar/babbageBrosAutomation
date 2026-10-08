@@ -33,10 +33,19 @@ export async function confirmBatch(email:string,batchId:string):Promise<Confirme
  catch(error){ const message=error instanceof Error?error.message:'';throw new ApiError(409,'IMPORT_REJECTED',message.includes('BATCH')?'This preview expired, contains errors, or was already confirmed.':'Import validation changed. No records were applied; create a fresh preview.'); }
  if(result.type==='attendance'||result.type==='marks') {
    try {await dispatchRiskEmails(email);}catch{console.error('[email] post-import dispatch failed');}
-    if(result.type==='attendance'&&beforeLoaded) {
-     try {const after:typeof before=await integrationQuery('riskTargets',{professorEmail:email});const previous=new Set(before.filter(t=>t.attendancePercentage!==null&&t.attendancePercentage<t.threshold).map(t=>`${t.studentId}:${t.subjectId}`));
-       await Promise.all(after.filter(t=>t.attendancePercentage!==null&&t.attendancePercentage<t.threshold&&!previous.has(`${t.studentId}:${t.subjectId}`)).map(async t=>{try{await dispatchAtRiskAttendanceCall(t.studentId,t.subjectId,email);}catch{console.error('[voice] post-import dispatch failed');}}));
-     }catch{console.error('[voice] post-import risk lookup failed');}
+   if(result.type==='attendance'&&beforeLoaded) {
+     try {
+       const after:typeof before=await integrationQuery('riskTargets',{professorEmail:email});
+       const previouslyAtRisk=new Set(before
+         .filter(target=>target.attendancePercentage!==null&&target.attendancePercentage<target.threshold)
+         .map(target=>`${target.studentId}:${target.subjectId}`));
+       await Promise.all(after
+         .filter(target=>target.attendancePercentage!==null&&target.attendancePercentage<target.threshold&&!previouslyAtRisk.has(`${target.studentId}:${target.subjectId}`))
+         .map(async target=>{
+           try {await dispatchAtRiskAttendanceCall(target.studentId,target.subjectId,email);}
+           catch {console.error('[voice] post-import dispatch failed');}
+         }));
+     } catch {console.error('[voice] post-import risk lookup failed');}
    }
  }
  return result;

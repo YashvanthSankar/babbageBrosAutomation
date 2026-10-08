@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:preview": "NEXT_BUILD_DIR=.next-preview next dev --port 3001 --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

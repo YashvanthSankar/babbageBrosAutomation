@@ -83,8 +83,8 @@ export async function dispatchAtRiskAttendanceCall(
   }
 
   try {
-    // The public demo must never disclose an uploaded student's actual
-    // attendance to the pinned test recipient. Use fixed synthetic demo facts.
+    // Never disclose an uploaded student's real number or academic details.
+    // Live demo uses only the pinned test number and fixed synthetic context.
     await dispatchAttendanceCall({ toNumber: recipient, attendancePercentage: 80 });
     await integrationMutation('finishNotification', { id, status: 'dispatched' });
     return { dispatched: true, status: 'dispatched', attendancePercentage: target.attendancePercentage };

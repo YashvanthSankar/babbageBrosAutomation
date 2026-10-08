@@ -8,6 +8,7 @@ import type { DashboardResponse } from "./types";
 import AdminDashboard from "./AdminDashboard";
 import StudentDashboard from "./StudentDashboard";
 import { Alert, Spinner } from "./ui";
+import Icon from "./Icon";
 
 /**
  * Demo mode is intentionally loud: any nonempty password is accepted by the
@@ -66,7 +67,7 @@ export default function Dashboard() {
   const roleLabel = data?.role === "admin" ? "Professor / Admin" : data?.role === "student" ? "Student" : "Signed in";
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${data?.role === "admin" ? "faculty-shell" : ""}`}>
       <header className="appbar">
         <div className="container appbar-inner">
           <div className="brand">
@@ -107,11 +108,11 @@ export default function Dashboard() {
       <div className="demo-banner" role="note">
         <div className="container">
           <strong>{DEMO_WARNING}</strong>{" "}
-          Attendance, marks and appointments in one place.
+          Attendance · Assessments · Student support
         </div>
       </div>
 
-      <main className="container" style={{ paddingTop: 26, paddingBottom: 40 }}>
+      <main className={`container ${data?.role === "admin" ? "dashboard-main" : ""}`} style={{ paddingTop: 26, paddingBottom: 40 }}>
         {loading && !data ? (
           <div className="loading-panel" style={{ padding: "80px 0" }}>
             <Spinner large />
@@ -222,114 +223,34 @@ function Landing() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="appbar">
-        <div className="container appbar-inner">
-          <div className="brand">
-            <div className="brand-mark" aria-hidden>
-              SS
-            </div>
-            <div className="brand-text">
-              <span className="brand-title">Student Success</span>
-              <span className="brand-sub">Attendance · Marks · Advising</span>
-            </div>
-          </div>
-          <div className="spacer" />
-          <span className="badge badge-warn">
-            <span className="dot" aria-hidden />
-            Demo mode
-          </span>
-        </div>
+    <div className="welcome-shell">
+      <header className="welcome-header">
+        <a href="/" className="welcome-brand" aria-label="Student Success home"><span className="welcome-mark"><Icon name="book" size={22} /></span><span>Student Success<span className="welcome-brand-sub">Babbage Bros</span></span></a>
+        <span className="welcome-event">CS Week 2026 <span>Education track</span></span>
       </header>
-
-      <main className="container">
-        <div className="hero">
-          <div className="hero-grid">
-            <div>
-              <span className="eyebrow">Demo access</span>
-              <h1>
-                Keep every student
-                <br />
-                on track.
-              </h1>
-              <p className="hero-lead">
-                One dashboard for the professor to import rosters, attendance, and marks — and for
-                each student to see their own attendance, scores, recovery plan, and book an
-                appointment slot. Use your institute email to open your dashboard.
-              </p>
-
-              <ul className="feature-list">
-                <li className="feature">
-                  <span className="feature-icon" aria-hidden>
-                    ✓
-                  </span>
-                  <span>
-                    <strong>Roster-first imports.</strong> Roster, then attendance and marks — with
-                    row-level errors.
-                  </span>
-                </li>
-                <li className="feature">
-                  <span className="feature-icon" aria-hidden>
-                    ✓
-                  </span>
-                  <span>
-                    <strong>Computed risk.</strong> Attendance percentage and recovery classes,
-                    never guessed.
-                  </span>
-                </li>
-                <li className="feature">
-                  <span className="feature-icon" aria-hidden>
-                    ✓
-                  </span>
-                  <span>
-                    <strong>Private by design.</strong> Students see only their own records.
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="hero-panel">
-              <div className="row-between">
-                <div className="card-title">Sign in</div>
-                <span className="badge badge-warn">Demo</span>
-              </div>
-
-              <div style={{ marginTop: 14 }}>
-                <Alert tone="warn" title="Demo mode">
-                  <p>
-                    <strong>{DEMO_WARNING}</strong>
-                  </p>
-                  <p className="small" style={{ marginTop: 6 }}>
-                    Every record shown here is synthetic demo data — no real student information is
-                    loaded.
-                  </p>
-                </Alert>
-              </div>
-
-              <div className="demo-prefill" aria-label="Demo account shortcuts">
-                <div className="demo-prefill-head">
-                  <div>
-                    <div className="card-title">Try a ready-made view</div>
-                    <p className="small muted">Fill the form instantly, then sign in.</p>
-                  </div>
-                  <span className="demo-prefill-arrow" aria-hidden>↘</span>
-                </div>
-                <div className="demo-prefill-grid">
-                  <button className="demo-role-card student" type="button" onClick={() => prefillDemo("student")} disabled={pending}>
-                    <span className="demo-role-kicker">Student demo</span>
-                    <strong>Narendhar</strong>
-                    <span>Attendance, marks &amp; recovery plan</span>
-                    <span className="demo-role-cta">Prefill student →</span>
-                  </button>
-                  <button className="demo-role-card professor" type="button" onClick={() => prefillDemo("professor")} disabled={pending}>
-                    <span className="demo-role-kicker">Professor demo</span>
-                    <strong>Professor</strong>
-                    <span>Risk dashboard, imports &amp; calls</span>
-                    <span className="demo-role-cta">Prefill professor →</span>
-                  </button>
-                </div>
-              </div>
-
+      <main className="welcome-main">
+        <section className="welcome-story" aria-labelledby="welcome-title">
+          <span className="welcome-eyebrow"><span /> A little clarity. Better outcomes.</span>
+          <h1 id="welcome-title">See the signs.<br />Support the student.</h1>
+          <p className="welcome-lead">Attendance, assessment results, and the next step — together in one calm workspace.</p>
+          <div className="welcome-preview" aria-label="Illustrative student recovery plan">
+            <div className="welcome-preview-head"><span><Icon name="chart" size={18} /> A clearer path forward</span><span className="welcome-example">Example</span></div>
+            <div className="welcome-preview-body"><div><span className="welcome-caption">Attendance</span><strong>80<span>%</span></strong><span className="welcome-target">85% required</span></div><div className="welcome-recovery"><span className="welcome-caption">Recovery plan</span><strong>7 more classes</strong><span>Attend consecutively to get back on track.</span></div></div>
+            <div className="welcome-track" aria-hidden="true"><span /></div>
+            <div className="welcome-preview-foot"><Icon name="check" size={16} /> A practical next step for every student.</div>
+          </div>
+          <div className="welcome-features">
+            <div><Icon name="upload" size={20} /><strong>Import once.</strong><p>Upload attendance and marks with a preview before confirming.</p></div>
+            <div><Icon name="alert" size={20} /><strong>Find who needs help.</strong><p>See attendance concerns and weak or falling results first.</p></div>
+            <div><Icon name="clock" size={20} /><strong>Make time to talk.</strong><p>Students can book an available advising appointment.</p></div>
+          </div>
+        </section>
+        <section className="welcome-signin" aria-labelledby="signin-title">
+          <span className="welcome-caption">YOUR WORKSPACE</span>
+          <h2 id="signin-title">Welcome in.</h2>
+          <p className="welcome-signin-intro">Sign in with your institute email to continue.</p>
+          <div className="welcome-demo-note"><strong>Competition demo</strong><span>Use synthetic records only. Any nonempty password is accepted.</span></div>
+          <div className="welcome-shortcuts" aria-label="Demo account shortcuts"><button type="button" disabled={pending} onClick={() => prefillDemo("professor")}><Icon name="grid" size={18} /> Try professor <Icon name="arrow" size={16} /></button><button type="button" disabled={pending} onClick={() => prefillDemo("student")}><Icon name="users" size={18} /> Try student <Icon name="arrow" size={16} /></button></div>
               <form className="auth-form" onSubmit={handleSubmit} noValidate>
                 <div className="field">
                   <label className="field-label" htmlFor="demo-name">
@@ -415,43 +336,10 @@ function Landing() {
                   {pending ? "Signing in…" : "Sign in"}
                 </button>
               </form>
-
-              <hr className="divider" style={{ margin: "18px 0" }} />
-
-              <div className="card-title">Appointment scheduling</div>
-              <p className="small muted" style={{ marginTop: 6 }}>
-                Choose an available appointment slot after signing in. Each confirmed appointment is
-                recorded against the selected subject and protected from double booking.
-              </p>
-
-              <div className="mini-table">
-                <div className="mini-row">
-                  <span>
-                    <strong>Professor</strong>
-                    <div className="small muted">Roster, imports, risk table, appointments</div>
-                  </span>
-                  <span className="badge badge-accent">Admin</span>
-                </div>
-                <div className="mini-row">
-                  <span>
-                    <strong>Student</strong>
-                    <div className="small muted">Attendance, marks, appointments</div>
-                  </span>
-                  <span className="badge badge-ok">Roster</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          <p className="welcome-role-note"><Icon name="check" size={15} /> Your account determines your view. Students see their own records.</p>
+        </section>
       </main>
-
-      <footer className="footer">
-        <div className="container">
-          Demo sign-in accepts any nonempty password and shows synthetic records only. The server
-          assigns the role from the account email. Appointment slots are shown only when returned by
-          the service.
-        </div>
-      </footer>
+      <footer className="welcome-footer"><span>Student Success · Built for CS Week</span><span>Attendance. Progress. A conversation.</span></footer>
     </div>
   );
 }

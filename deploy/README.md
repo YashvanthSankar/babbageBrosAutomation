@@ -16,7 +16,7 @@ Convex production is `https://groovy-sheep-854.convex.cloud` in Denoise Labs's
 
 Calendar OAuth requires a web client with redirect URI
 `https://YOUR_DOMAIN/api/auth/callback/google-professor` and professor consent.
-Resend requires `RESEND_FROM_EMAIL` from an allowed sender domain.
+Public provider automation defaults to simulation. For a controlled live test, set `DEMO_LIVE_AUTOMATIONS=true`, configure provider credentials, and pin consenting `DEMO_AUTOMATION_EMAIL` and/or `DEMO_AUTOMATION_PHONE` destinations. Resend also requires a verified sender. Live test messages and calls use fixed synthetic content and never use uploaded student addresses, phone numbers, or academic details; each provider is capped at one live dispatch per UTC day. Provider acceptance does not prove an email was read or a call was answered. Weekly summaries are not implemented.
 Never store environment secrets or uploaded student files in Git.
 
 The production Convex functions are already deployed. A VPS clone does not

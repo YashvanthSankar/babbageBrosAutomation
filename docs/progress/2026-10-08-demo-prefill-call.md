@@ -1,5 +1,4 @@
-# Demo prefill and voice-call CTA
+# Historical demo prefill and arbitrary-call CTA — superseded
 
-- Added prominent student and professor shortcuts that prefill the demo sign-in form. Each shortcut generates a valid-format random Indian phone number; the student shortcut uses Narendhar and `ec24b1053@iiitdm.ac.in`, while the professor shortcut uses the configured demo professor identity.
-- Added a professor-dashboard CTA that accepts an Indian E.164 number and dispatches the OmniDimension agent with a fixed synthetic attendance value of 69%.
-- The demo-call endpoint derives professor authorization from the NextAuth session, validates the number server-side, keeps provider credentials server-only, and applies per-number and global in-memory rate limits.
+- An earlier UI experiment added prefilled demo accounts and an arbitrary-number call action. The arbitrary-number endpoint and UI action were removed because public, any-password demo access cannot safely authorize calls to user-supplied destinations.
+- Current voice automation runs only for newly-below-threshold attendance after import. It simulates by default; explicit live testing is limited to a server-pinned consenting test number and fixed synthetic content.

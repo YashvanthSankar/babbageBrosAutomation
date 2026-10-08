@@ -1,128 +1,110 @@
 # API reference
 
-All JSON endpoints return `{ "data": ... }` on success or:
+The Next.js server is the public API. It verifies the NextAuth session, derives the professor/student identity from that session, and accesses Convex using a server-only secret. Do not call Convex with the backend secret from a browser.
 
-```json
-{ "error": { "code": "VALIDATION_ERROR", "message": "...", "fields": {} } }
-```
+Most route errors use `{ "error": { "code": "...", "message": "...", "details": ... } }`. Successful response shapes vary by endpoint. The dashboard uses the NextAuth browser session cookie automatically.
 
-Except for health, templates, and demo session creation, endpoints require the `attendly_session` HTTP-only cookie. Browser clients receive it automatically. CLI clients must persist the cookie.
+## Authentication and safety
 
-## Session and health
+- Sign-in uses the app's NextAuth flow. The demo accepts any non-empty password; the exact `PROFESSOR_EMAIL` is treated as the professor/admin and institute-domain emails enter the student flow.
+- This is demo access, not identity verification. Never use real student marks, phone numbers, or other private records on the public demo.
+- Professor-only routes require the admin session. Student routes derive the student from the signed-in email; clients must not supply an owner identity to gain access.
+- Google Calendar uses a separate professor-only OAuth consent flow. A Google API key alone cannot read or create events in a private calendar.
+
+## Health and dashboard
 
 ### `GET /api/health`
 
-Checks both the HTTP service and database connection. Returns 200 with `status: "ok"`, or 503 with `DATABASE_UNAVAILABLE`.
+Checks the server-to-Convex connection. Returns the Convex health result or a standard API error.
 
-### `POST /api/session/demo`
+### `GET /api/dashboard`
 
-Upserts the demo teacher using `DEMO_TEACHER_EMAIL` and `DEMO_TEACHER_NAME`, sets the session cookie, and returns the teacher. No request body.
+Returns the signed-in user's dashboard. Admin receives the professor workspace and risk-ranked student/subject statistics; a student receives only their own records. Attendance recovery and marks flags are calculated server-side.
 
-### `POST /api/session/logout`
+### `GET /api/marks/dashboard`
 
-Clears the session cookie.
+Returns marks information scoped to the signed-in user/administrator.
 
-PowerShell example:
+## Subjects and students
 
-```powershell
-$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/session/demo -WebSession $session
-Invoke-RestMethod -Uri http://localhost:3000/api/students -WebSession $session
-```
+### `GET`, `POST`, `PATCH /api/subjects`
 
-## Students
-
-### `GET /api/students`
-
-Returns all active and inactive students in roll-number order.
-
-### `POST /api/students`
+Professor-only subject management. Create a subject with JSON such as:
 
 ```json
-{ "rollNumber": "CS001", "name": "Asha Rao", "email": "asha@example.com", "phone": "+91 98765 43210" }
+{ "name": "Algorithms", "code": "CS301", "department": "CSE", "threshold": 85, "marksThreshold": 50 }
 ```
 
-Returns 201. Roll numbers are unique inside the teacher workspace.
+`threshold` is the attendance percentage target; marks threshold is a percentage.
 
-### `PATCH /api/students`
+### `GET`, `POST`, `PATCH /api/students`
 
-Accepts `id` plus any of `rollNumber`, `name`, `email`, `phone`, or `active`.
-
-## Subjects
-
-### `GET /api/subjects`
-
-Returns teacher-owned subjects ordered by name.
-
-### `POST /api/subjects`
-
-```json
-{ "name": "Machine Learning", "code": "CS401", "threshold": 85 }
-```
-
-`code` is optional. `threshold` must be an integer from 1–99 and defaults to 85.
-
-### `PATCH /api/subjects`
-
-Accepts `id` plus any subject fields.
+Professor-only student roster management. The roster should be imported before attendance or marks. Student phone numbers are admin-only and are not returned in student dashboard responses.
 
 ## Imports
 
-### `POST /api/imports/roster/preview`
+Uploads are `multipart/form-data` with a `file` field. Roster is imported first. Attendance and marks uploads also need the relevant `subjectId`.
 
-Send `multipart/form-data` with an `.xlsx` field named `file`.
+### Staged preview and confirmation
 
-### `POST /api/imports/attendance/preview`
+- `POST /api/imports/roster/preview` — stage and validate a roster file.
+- `POST /api/imports/attendance/preview` — requires `file` and `subjectId`.
+- `POST /api/imports/marks/preview` — requires `file`, `subjectId`, `assessmentName`, `assessmentDate` (`YYYY-MM-DD`), and `maxMarks`.
+- `POST /api/imports/{batchId}/confirm` — apply a valid staged batch once. Preview batches expire; validation or ownership errors prevent confirmation.
 
-Send `multipart/form-data` with fields `file` and `subjectId`.
+Preview responses include `{ data: { batchId, expiresAt, canConfirm, report, preview } }`. CSV and XLSX are accepted by the preview routes. Attendance CSV date columns should be real dates; blank cells are skipped. Unknown roster IDs, invalid dates/statuses, and invalid scores are reported rather than silently assigned.
 
-Example preview response:
+### Direct dashboard imports
+
+`POST /api/ingest/roster`, `/api/ingest/attendance`, and `/api/ingest/marks` are professor-only multipart endpoints for the dashboard's direct import flow. Attendance requires `subjectId`; marks requires assessment metadata and `subjectId`. These routes apply validated records directly instead of returning a separate preview batch.
+
+### Templates
+
+- `GET /api/templates/roster`
+- `GET /api/templates/attendance`
+- `GET /api/templates/marks`
+
+Downloads the corresponding import template.
+
+## Appointments and Google Calendar
+
+### `GET /api/calendar/slots?subjectId=...&date=YYYY-MM-DD`
+
+Returns candidate slots as ISO timestamps and indicates whether availability came from Google Calendar or in-app reservations. If the professor has not connected Google Calendar, the response explains that availability is local only.
+
+### `POST /api/calendar/book`
+
+Student-only. JSON body:
 
 ```json
-{
-  "data": {
-    "batchId": "uuid",
-    "expiresAt": "2026-10-08T14:00:00.000Z",
-    "canConfirm": true,
-    "report": { "errors": [], "warnings": [], "summary": { "students": 20 } },
-    "preview": []
-  }
-}
+{ "subjectId": "...", "start": "2026-10-09T04:30:00.000Z", "end": "2026-10-09T05:00:00.000Z" }
 ```
 
-### `POST /api/imports/{batchId}/confirm`
+The server derives the student from the session, checks professor/subject ownership and slot conflicts, and records the booking. When professor OAuth is connected, it also checks Google availability and creates a Calendar event. Without OAuth, it is an in-app booking only.
 
-No request body. Returns batch type and processed row/record count. Confirmation is atomic and can happen only once.
+## Automation status and activity
 
-### `GET /api/templates/roster`
+### `GET /api/automation/status`
 
-Downloads the roster `.xlsx` template.
+Professor-only provider readiness: Convex, simulation/live mode, Resend, OmniDimension, Calendar, and weekly-summary configuration. A provider-accepted status is not proof an email was read or a call was answered.
 
-### `GET /api/templates/attendance`
+### `GET /api/automation/activity`
 
-Downloads the attendance `.xlsx` template.
+Professor-only recent notification events, including whether an event was simulated or accepted by a configured provider.
 
-## Dashboard data
+### `POST /api/voice/call`
 
-### `GET /api/dashboard?subjectId={uuid}`
+Professor-only JSON `{ "studentId": "...", "subjectId": "..." }`. The service checks risk; public mode records a simulation. Explicit live tests can dispatch only to a server-pinned consenting test number using fixed synthetic context. This route does not accept a phone number. There is no arbitrary-number demo-call endpoint.
 
-The query parameter is optional; the first subject by name is selected by default. Returns the subject list, selected subject, summary counts, class average, and sorted per-student risk rows. Returns a null summary and empty student list when no subject exists.
+## Common error codes
 
-## Voice demo
-
-### `POST /api/voice/demo-call`
-
-Professor-only. Accepts `{ "phone": "+919876543210" }` and dispatches the voice agent with a fixed synthetic attendance context of 69%. Numbers must be Indian E.164 mobile numbers. Calls are limited to one per number every 10 minutes and 12 calls per server hour.
-
-## Important error codes
-
-| Code | HTTP status | Meaning |
-| --- | ---: | --- |
-| `UNAUTHENTICATED` | 401 | Session missing or invalid |
-| `VALIDATION_ERROR` | 422 | JSON/form field validation failed |
-| `INVALID_WORKBOOK` | 422 | File type, size, or workbook structure failed |
-| `DUPLICATE_ROLL` | 409 | Manual student creation reused a roll number |
-| `SUBJECT_NOT_FOUND` | 404 | Subject is absent or belongs to another teacher |
-| `BATCH_HAS_ERRORS` | 409 | Preview contains blocking errors |
-| `BATCH_UNAVAILABLE` | 409 | Batch expired, was already claimed, or is not teacher-owned |
-| `DATABASE_UNAVAILABLE` | 503 | Health check could not reach PostgreSQL |
+| Code | Meaning |
+| --- | --- |
+| `UNAUTHENTICATED` | No valid signed-in session |
+| `FORBIDDEN` | Session role or ownership does not permit the action |
+| `VALIDATION_ERROR` | Invalid request or upload fields |
+| `INVALID_WORKBOOK` | Unsupported or malformed import file |
+| `BATCH_HAS_ERRORS` | Staged import contains blocking validation errors |
+| `BATCH_UNAVAILABLE` | Batch expired, already applied, or not owned by the professor |
+| `SLOT_UNAVAILABLE` | The requested appointment overlaps an existing booking/event |
+| `INTERNAL_ERROR` | Unexpected server error; check server logs without logging secrets |
