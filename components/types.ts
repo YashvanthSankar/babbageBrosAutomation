@@ -29,6 +29,7 @@ export type SubjectStat = {
   trend?: Trend;
   atRisk?: boolean;
   riskLevel?: RiskLevel;
+  threshold?: number;
 };
 
 export type Student = {

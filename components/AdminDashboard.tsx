@@ -19,6 +19,17 @@ import UploadsPanel from "./UploadsPanel";
 
 type Tab = "students" | "imports";
 
+type CallStatus = {
+  state: "idle" | "pending" | "success" | "error";
+  message?: string;
+};
+
+type VoiceCallResponse = {
+  call?: {
+    status?: "dispatched" | "duplicate" | "not_at_risk";
+  };
+};
+
 export default function AdminDashboard({
   data,
   onChanged,
@@ -210,6 +221,7 @@ export default function AdminDashboard({
                     <th>Subjects &amp; attendance</th>
                     <th>Overall</th>
                     <th>Risk</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -231,6 +243,37 @@ export default function AdminDashboard({
 function StudentRow({ student }: { student: Student }) {
   const overall = overallAttendance(student.subjects ?? []);
   const risk = studentRiskBadge(student);
+  const [calls, setCalls] = useState<Record<string, CallStatus>>({});
+
+  async function callStudent(subject: SubjectStat) {
+    const key = String(subject.id);
+    setCalls((current) => ({ ...current, [key]: { state: "pending" } }));
+    const result = await apiPostJson<VoiceCallResponse>("/api/voice/call", {
+      studentId: String(student.id),
+      subjectId: key,
+    });
+    if (!result.ok) {
+      setCalls((current) => ({
+        ...current,
+        [key]: { state: "error", message: result.error ?? "Could not dispatch the call." },
+      }));
+      return;
+    }
+
+    const status = result.data?.call?.status;
+    const message = status === "duplicate"
+      ? "Already called for this attendance record."
+      : status === "not_at_risk"
+        ? "Attendance is no longer below the threshold."
+        : "Call dispatched.";
+    setCalls((current) => ({ ...current, [key]: { state: "success", message } }));
+  }
+
+  const attendanceRisks = (student.subjects ?? []).filter((subject) => {
+    const percent = attendancePercent(subject);
+    return percent !== null && percent < (subject.threshold ?? 85);
+  });
+
   return (
     <tr>
       <td className="mono">{student.rollNo ?? "—"}</td>
@@ -275,6 +318,41 @@ function StudentRow({ student }: { student: Student }) {
           <span className="dot" aria-hidden />
           {risk.label}
         </Badge>
+      </td>
+      <td>
+        {attendanceRisks.length > 0 ? (
+          <div className="call-actions">
+            {attendanceRisks.map((subject) => {
+              const key = String(subject.id);
+              const call = calls[key] ?? { state: "idle" as const };
+              const complete = call.state === "success";
+              return (
+                <div className="call-action" key={key}>
+                  <button
+                    className="btn btn-sm"
+                    type="button"
+                    disabled={call.state === "pending" || complete}
+                    onClick={() => callStudent(subject)}
+                    aria-label={`Call ${student.name ?? "student"} about ${subjectLabel(subject)}`}
+                  >
+                    {call.state === "pending" ? "Calling…" : complete ? "Called" : "Call student"}
+                    <span className="mono call-subject">{subject.code || subject.name}</span>
+                  </button>
+                  {call.message ? (
+                    <span
+                      className={`call-status ${call.state === "error" ? "call-status-error" : ""}`}
+                      role={call.state === "error" ? "alert" : "status"}
+                    >
+                      {call.message}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <span className="muted small">—</span>
+        )}
       </td>
     </tr>
   );
