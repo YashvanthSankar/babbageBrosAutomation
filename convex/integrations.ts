@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { v, ConvexError } from 'convex/values';
 import { query, mutation } from './_generated/server';
 function authorize(secret:string) { if(!process.env.CONVEX_BACKEND_SECRET || process.env.CONVEX_BACKEND_SECRET!==secret) throw new Error('UNAUTHORIZED_BACKEND'); }
 export const token = query({args:{secret:v.string(),professorEmail:v.string()},handler:async(ctx,args)=>{authorize(args.secret); return ctx.db.query('calendarTokens').withIndex('by_professor',q=>q.eq('professorEmail',args.professorEmail)).unique();}});
@@ -8,7 +8,7 @@ export const reserve = mutation({args:{secret:v.string(),professorEmail:v.string
  authorize(args.secret);const student=await ctx.db.get(args.studentId);const subject=await ctx.db.get(args.subjectId);const teacher=subject?await ctx.db.get(subject.teacherId):null;
  if(!student||!subject||student.teacherId!==subject.teacherId||teacher?.email!==args.professorEmail)throw new Error('FORBIDDEN');
  const all=await ctx.db.query('bookings').withIndex('by_professor',q=>q.eq('professorEmail',args.professorEmail)).collect();
- if(all.some(b=>(b.status==='pending'||b.status==='confirmed')&&b.start<args.end&&b.end>args.start))throw new Error('SLOT_UNAVAILABLE');
+ if(all.some(b=>(b.status==='pending'||b.status==='confirmed')&&b.start<args.end&&b.end>args.start))throw new ConvexError('SLOT_UNAVAILABLE');
  return ctx.db.insert('bookings',{professorEmail:args.professorEmail,studentId:args.studentId,subjectId:args.subjectId,start:args.start,end:args.end,status:'pending'});
 }});
 export const finishBooking = mutation({args:{secret:v.string(),id:v.id('bookings'),status:v.string(),googleEventId:v.optional(v.string())},handler:async(ctx,args)=>{authorize(args.secret);await ctx.db.patch(args.id,{status:args.status,...(args.googleEventId?{googleEventId:args.googleEventId}:{})});}});

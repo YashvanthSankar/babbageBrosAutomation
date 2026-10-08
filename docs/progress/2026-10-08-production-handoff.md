@@ -16,3 +16,6 @@
   No live website deployment or successful provider delivery is claimed.
 - Feature development paused at the user's request; runtime smoke checks
   continue after the main-branch push.
+- Runtime uploads and professor/student access against Convex production
+  passed. Fixed expected booking-conflict errors to survive Convex transport
+  and return HTTP 409 to the student.
