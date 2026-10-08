@@ -14,12 +14,13 @@ export const studentInput = z.object({
 
 export const studentPatch = studentInput
   .partial()
-  .extend({ id: z.string().uuid(), active: z.boolean().optional() });
+  .extend({ id: z.string().min(1), active: z.boolean().optional() });
 
 export const subjectInput = z.object({
   name: z.string().trim().min(2).max(120),
   code: z.string().trim().max(30).optional().nullable(),
-  threshold: z.coerce.number().int().min(1).max(99).default(85),
+  attendanceThreshold: z.coerce.number().int().min(1).max(99).default(85),
+  marksThreshold: z.coerce.number().int().min(1).max(99).default(50),
 });
 
-export const subjectPatch = subjectInput.partial().extend({ id: z.string().uuid() });
+export const subjectPatch = subjectInput.partial().extend({ id: z.string().min(1) });

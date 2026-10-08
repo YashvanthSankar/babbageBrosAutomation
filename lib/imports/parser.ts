@@ -1,16 +1,18 @@
 import ExcelJS from "exceljs";
 import { z } from "zod";
-import type { ValidationItem } from "@/lib/db/schema";
 import type {
   AttendancePayload,
   KnownStudent,
   ParseResult,
   RosterPayload,
   RosterRow,
+  MarksPayload,
+  ValidationItem,
 } from "./types";
 
-const MAX_ROWS = 2_000;
+const MAX_ROWS = 500;
 const MAX_DATE_COLUMNS = 370;
+const MAX_ATTENDANCE_RECORDS = 2_000;
 const MAX_REPORT_ITEMS = 250;
 const rosterHeaders = ["roll_number", "name", "email", "phone"] as const;
 const emailSchema = z.string().email();
@@ -209,10 +211,65 @@ export async function parseAttendanceWorkbook(
   if (blankCells) {
     pushItem(warnings, { code: "BLANK_CELLS", message: `${blankCells} blank attendance cell${blankCells === 1 ? " was" : "s were"} skipped.` });
   }
+  if (entries.length > MAX_ATTENDANCE_RECORDS) {
+    pushItem(errors, { code: "TOO_MANY_RECORDS", message: `One upload may contain at most ${MAX_ATTENDANCE_RECORDS.toLocaleString()} non-blank attendance records.` });
+  }
   if (!studentRows) pushItem(errors, { code: "EMPTY_SHEET", message: "The sheet does not contain any student rows." });
   return {
     payload: { kind: "attendance", subjectId, entries },
     report: { errors, warnings, summary: { studentRows, dates: dates.length, records: entries.length, blankCells } },
     preview: entries.slice(0, 10),
+  };
+}
+
+export async function parseMarksWorkbook(
+  buffer: Buffer,
+  metadata: { subjectId: string; assessmentName: string; assessmentDate: string; maxMarks: number },
+  knownStudents: KnownStudent[],
+): Promise<ParseResult<MarksPayload>> {
+  const worksheet = await firstWorksheet(buffer);
+  const errors: ValidationItem[] = [];
+  const warnings: ValidationItem[] = [];
+  const first = normalizeHeader(worksheet.getRow(1).getCell(1).value);
+  const second = normalizeHeader(worksheet.getRow(1).getCell(2).value);
+  if (first !== "roll_number") pushItem(errors, { row: 1, column: "A", code: "INVALID_HEADER", message: 'Expected "roll_number" in column A.' });
+  if (second !== "marks_obtained") pushItem(errors, { row: 1, column: "B", code: "INVALID_HEADER", message: 'Expected "marks_obtained" in column B.' });
+
+  const studentMap = new Map(knownStudents.map((student) => [student.rollNumber.toLowerCase(), student]));
+  const seenRolls = new Set<string>();
+  const rows: MarksPayload["rows"] = [];
+  let blankMarks = 0;
+  for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber += 1) {
+    const row = worksheet.getRow(rowNumber);
+    const rollNumber = text(row.getCell(1).value);
+    const rawMark = row.getCell(2).value;
+    if (!rollNumber && !text(rawMark)) continue;
+    if (!rollNumber) {
+      pushItem(errors, { row: rowNumber, column: "A", code: "REQUIRED", message: "Roll number is required." });
+      continue;
+    }
+    const normalizedRoll = rollNumber.toLowerCase();
+    const student = studentMap.get(normalizedRoll);
+    if (!student) pushItem(errors, { row: rowNumber, column: "A", code: "UNKNOWN_STUDENT", message: `No student matches roll number ${rollNumber}.` });
+    else if (!student.active) pushItem(warnings, { row: rowNumber, column: "A", code: "INACTIVE_STUDENT", message: `${rollNumber} is inactive; marks will still be imported.` });
+    if (seenRolls.has(normalizedRoll)) pushItem(errors, { row: rowNumber, column: "A", code: "DUPLICATE_ROLL", message: `Roll number ${rollNumber} appears more than once.` });
+    seenRolls.add(normalizedRoll);
+    if (rawMark === null || rawMark === undefined || text(rawMark) === "") {
+      blankMarks += 1;
+      continue;
+    }
+    const marksObtained = typeof rawMark === "number" ? rawMark : Number(text(rawMark));
+    if (!Number.isFinite(marksObtained) || marksObtained < 0 || marksObtained > metadata.maxMarks) {
+      pushItem(errors, { row: rowNumber, column: "B", code: "INVALID_MARKS", message: `Marks must be between 0 and ${metadata.maxMarks}.` });
+      continue;
+    }
+    if (student) rows.push({ rollNumber: student.rollNumber, marksObtained });
+  }
+  if (blankMarks) pushItem(warnings, { code: "BLANK_MARKS", message: `${blankMarks} blank mark${blankMarks === 1 ? " was" : "s were"} skipped.` });
+  if (!rows.length) pushItem(errors, { code: "EMPTY_SHEET", message: "The sheet does not contain any valid mark rows." });
+  return {
+    payload: { kind: "marks", ...metadata, rows },
+    report: { errors, warnings, summary: { students: rows.length, blankMarks } },
+    preview: rows.slice(0, 10).map((row) => ({ ...row, percentage: Math.round((row.marksObtained / metadata.maxMarks) * 1000) / 10 })),
   };
 }

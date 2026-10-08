@@ -14,6 +14,7 @@ Convex setup produces the deployment configuration used by its CLI and client. K
 | --- | --- | --- |
 | `CONVEX_DEPLOYMENT` | Yes for development | Convex development deployment identifier |
 | `NEXT_PUBLIC_CONVEX_URL` | Yes | Convex deployment URL |
+| `CONVEX_BACKEND_SECRET` | Yes | Shared server-only secret configured in Next.js and Convex |
 | `SESSION_SECRET` | Production | Long random key for demo-session signing |
 | `DEMO_TEACHER_EMAIL` | No | Defaults to `demo@attendly.local` |
 | `DEMO_TEACHER_NAME` | No | Defaults to `Demo Faculty` |
@@ -37,6 +38,7 @@ Other commands:
 - `npm run build` — production compilation.
 - `npx convex dev` — synchronize the Convex schema/functions and generate API types.
 - `npx convex dashboard` — open the deployment dashboard.
+- `npm run convex:deploy` — deploy Convex schema and functions.
 
 ## Verification
 
@@ -46,11 +48,12 @@ Other commands:
 4. Create a subject.
 5. Download and complete the roster template; preview and confirm it.
 6. Download and complete the attendance template; preview and confirm it for the subject.
-7. Fetch the dashboard and verify the risk ordering and recovery values.
-8. Re-upload one changed A/P value and verify the existing record changes rather than duplicating.
+7. Download and complete the marks template; preview and confirm two assessments for the subject.
+8. Fetch both dashboards and verify attendance recovery plus weak/falling marks ordering.
+9. Re-upload changed attendance and marks values and verify existing records change rather than duplicate.
 
 ## Deployment
 
 The Next.js upload handlers require a Node.js runtime because ExcelJS is not configured for Edge execution. Convex functions deploy separately through the Convex CLI. Configure both Convex variables and `SESSION_SECRET` on the selected Next.js host, deploy the Convex functions, deploy the app, and verify `/api/health`.
 
-Do not follow the runtime commands above until `convex/schema.ts`, the required Convex functions, and the Convex package scripts have been added. That migration is the next blocking implementation task.
+Before starting Next.js, configure the Convex deployment secret with `npx convex env set CONVEX_BACKEND_SECRET <value>` and place the same value in the Next.js server environment.

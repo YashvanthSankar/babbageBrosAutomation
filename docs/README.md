@@ -1,6 +1,6 @@
 # Attendly documentation
 
-Attendly is currently a backend-first attendance ingestion and risk API. The repository includes only a minimal root page; the teacher dashboard UI is intentionally deferred.
+Attendly is currently a backend-first attendance and marks ingestion/risk API. The repository includes only a minimal root page; the teacher dashboard UI is intentionally deferred.
 
 ## Reading order
 
@@ -13,7 +13,6 @@ Attendly is currently a backend-first attendance ingestion and risk API. The rep
 
 ## Current status
 
-- Implemented and datastore-independent: workbook templates, roster/attendance parsing, validation reports, risk calculations, API contracts, and unit tests.
-- In progress: migrate persistence, teacher scoping, staged batches, atomic confirmation, CRUD, and dashboard queries to Convex.
-- Not implemented: production authentication, teacher dashboard UI, marks, email, calls, timetable appointments, weekly summaries, and AI analysis.
-- Requires external configuration: a Convex deployment URL/deployment identifier and a production `SESSION_SECRET`.
+- Implemented: Convex schema/functions, teacher-scoped student and subject CRUD, roster/attendance/marks templates and ingestion, staged atomic confirmation, correction-safe records, attendance and marks risk queries, demo session, health endpoint, and unit tests.
+- Not implemented: production authentication, teacher dashboard UI, email, calls, timetable appointments, weekly summaries, and AI-generated analysis.
+- Requires external configuration: a Convex deployment URL/deployment identifier, matching `CONVEX_BACKEND_SECRET` values, and a production `SESSION_SECRET`.

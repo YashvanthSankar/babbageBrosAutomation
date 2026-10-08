@@ -1,6 +1,6 @@
 # Workbook import contracts
 
-Only `.xlsx` files are accepted. The maximum size defaults to 2 MiB and can be changed with `MAX_UPLOAD_BYTES`. Only the first worksheet is processed. A workbook can have at most 2,000 data rows; attendance workbooks can have at most 370 date columns.
+Only `.xlsx` files are accepted. The maximum size defaults to 1 MiB and can be changed with `MAX_UPLOAD_BYTES`. Only the first worksheet is processed. A workbook can have at most 500 data rows; attendance workbooks can have at most 370 date columns and 2,000 non-blank attendance records per upload.
 
 ## Roster workbook
 
@@ -44,6 +44,25 @@ Rules:
 - Confirming upserts by student + subject + date, so a later confirmed upload corrects an existing value.
 
 Download the generated template from `GET /api/templates/attendance`.
+
+## Marks workbook
+
+Each upload represents one assessment. The request supplies `subjectId`, `assessmentName`, `assessmentDate` in `YYYY-MM-DD`, and a positive `maxMarks` no greater than 10,000. The workbook has exactly this leading structure:
+
+| roll_number | marks_obtained |
+| --- | ---: |
+| CS001 | 42 |
+| CS002 | 37.5 |
+
+Rules:
+
+- Marks may be integers or decimals from zero through `maxMarks`.
+- Blank marks mean “not recorded,” are skipped, and produce an aggregate warning.
+- Duplicate roll numbers, unknown students, non-numeric marks, and out-of-range marks are blocking errors.
+- Inactive students produce a warning but can still receive marks.
+- Re-uploading the same subject, assessment date, and case-insensitive assessment name corrects existing results rather than creating a duplicate assessment.
+
+Download the generated template from `GET /api/templates/marks`.
 
 ## Preview lifecycle
 

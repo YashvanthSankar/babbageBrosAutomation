@@ -57,10 +57,10 @@ Returns teacher-owned subjects ordered by name.
 ### `POST /api/subjects`
 
 ```json
-{ "name": "Machine Learning", "code": "CS401", "threshold": 85 }
+{ "name": "Machine Learning", "code": "CS401", "attendanceThreshold": 85, "marksThreshold": 50 }
 ```
 
-`code` is optional. `threshold` must be an integer from 1–99 and defaults to 85.
+`code` is optional. Both thresholds must be integers from 1–99; attendance defaults to 85 and marks defaults to 50.
 
 ### `PATCH /api/subjects`
 
@@ -94,6 +94,10 @@ Example preview response:
 
 No request body. Returns batch type and processed row/record count. Confirmation is atomic and can happen only once.
 
+### `POST /api/imports/marks/preview`
+
+Send `multipart/form-data` with `file`, `subjectId`, `assessmentName`, `assessmentDate`, and `maxMarks`. The workbook contains `roll_number | marks_obtained`. Confirmation uses the same generic confirm endpoint.
+
 ### `GET /api/templates/roster`
 
 Downloads the roster `.xlsx` template.
@@ -102,11 +106,19 @@ Downloads the roster `.xlsx` template.
 
 Downloads the attendance `.xlsx` template.
 
+### `GET /api/templates/marks`
+
+Downloads the marks `.xlsx` template.
+
 ## Dashboard data
 
 ### `GET /api/dashboard?subjectId={uuid}`
 
 The query parameter is optional; the first subject by name is selected by default. Returns the subject list, selected subject, summary counts, class average, and sorted per-student risk rows. Returns a null summary and empty student list when no subject exists.
+
+### `GET /api/marks/dashboard?subjectId={convexId}`
+
+Requires `subjectId`. Returns subject metadata, chronological assessments, summary counts, and students ordered Critical, Weak, Falling, Stable, and No Data. Each student includes latest, previous, average, percentage-point change, and boolean weak/falling flags.
 
 ## Important error codes
 

@@ -1,4 +1,15 @@
-import type { ValidationReport } from "@/lib/db/schema";
+export type ValidationItem = {
+  row?: number;
+  column?: string;
+  code: string;
+  message: string;
+};
+
+export type ValidationReport = {
+  errors: ValidationItem[];
+  warnings: ValidationItem[];
+  summary: Record<string, number>;
+};
 
 export type RosterRow = {
   rollNumber: string;
@@ -18,6 +29,16 @@ export type AttendancePayload = {
   kind: "attendance";
   subjectId: string;
   entries: AttendanceEntry[];
+};
+
+export type MarksRow = { rollNumber: string; marksObtained: number };
+export type MarksPayload = {
+  kind: "marks";
+  subjectId: string;
+  assessmentName: string;
+  assessmentDate: string;
+  maxMarks: number;
+  rows: MarksRow[];
 };
 
 export type ParseResult<T> = {

@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { parseAttendanceWorkbook, parseRosterWorkbook } from "@/lib/imports/parser";
+import { parseAttendanceWorkbook, parseMarksWorkbook, parseRosterWorkbook } from "@/lib/imports/parser";
 
 async function workbookBuffer(rows: unknown[][]) {
   const workbook = new ExcelJS.Workbook();
@@ -28,6 +28,24 @@ describe("roster parser", () => {
     ]);
     const result = await parseRosterWorkbook(buffer);
     expect(result.report.errors.map((error) => error.code)).toEqual(expect.arrayContaining(["INVALID_EMAIL", "INVALID_PHONE", "DUPLICATE_ROLL"]));
+  });
+});
+
+describe("marks parser", () => {
+  const known = [{ id: "student-1", rollNumber: "CS001", active: true }];
+
+  it("normalizes valid marks and calculates preview percentages", async () => {
+    const buffer = await workbookBuffer([["roll_number", "marks_obtained"], ["CS001", 42]]);
+    const result = await parseMarksWorkbook(buffer, { subjectId: "subject-1", assessmentName: "Quiz 1", assessmentDate: "2026-10-08", maxMarks: 50 }, known);
+    expect(result.report.errors).toEqual([]);
+    expect(result.payload.rows).toEqual([{ rollNumber: "CS001", marksObtained: 42 }]);
+    expect(result.preview[0].percentage).toBe(84);
+  });
+
+  it("rejects marks above the maximum and unknown students", async () => {
+    const buffer = await workbookBuffer([["roll_number", "marks_obtained"], ["UNKNOWN", 51]]);
+    const result = await parseMarksWorkbook(buffer, { subjectId: "subject-1", assessmentName: "Quiz 1", assessmentDate: "2026-10-08", maxMarks: 50 }, known);
+    expect(result.report.errors.map((error) => error.code)).toEqual(expect.arrayContaining(["UNKNOWN_STUDENT", "INVALID_MARKS"]));
   });
 });
 

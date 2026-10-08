@@ -1,8 +1,6 @@
-import { and, asc, eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { attendanceRecords, students, subjects } from "@/lib/db/schema";
 import { requireTeacherId } from "@/lib/auth";
 import { fail, handleRouteError, ok } from "@/lib/api";
+import { convexApi, convexClient, convexSecret } from "@/lib/convex";
 import { attendancePercentage, compareRisk, recoveryClasses, riskStatus } from "@/lib/risk";
 
 export const runtime = "nodejs";
@@ -10,69 +8,28 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   try {
     const teacherId = await requireTeacherId();
-    const allSubjects = await db
-      .select({ id: subjects.id, name: subjects.name, code: subjects.code, threshold: subjects.threshold })
-      .from(subjects)
-      .where(eq(subjects.teacherId, teacherId))
-      .orderBy(asc(subjects.name));
-    const requestedId = new URL(request.url).searchParams.get("subjectId");
-    const subject = requestedId
-      ? allSubjects.find((item) => item.id === requestedId)
-      : allSubjects[0];
-    if (requestedId && !subject) return fail("SUBJECT_NOT_FOUND", "Subject not found.", 404);
-    if (!subject) return ok({ subjects: allSubjects, selectedSubject: null, summary: null, students: [] });
-
-    const studentRows = await db
-      .select({ id: students.id, rollNumber: students.rollNumber, name: students.name, email: students.email })
-      .from(students)
-      .where(and(eq(students.teacherId, teacherId), eq(students.active, true)))
-      .orderBy(asc(students.rollNumber));
-    const records = await db
-      .select({ studentId: attendanceRecords.studentId, status: attendanceRecords.status })
-      .from(attendanceRecords)
-      .where(eq(attendanceRecords.subjectId, subject.id));
+    const subjectId = new URL(request.url).searchParams.get("subjectId") || undefined;
+    const raw = await convexClient().query(convexApi.dashboard, { secret: convexSecret(), teacherId, subjectId });
+    const subjects = raw.subjects.map((subject: any) => ({ id: subject._id, name: subject.name, code: subject.code ?? null, attendanceThreshold: subject.attendanceThreshold, marksThreshold: subject.marksThreshold }));
+    if (!raw.selectedSubject) return ok({ subjects, selectedSubject: null, summary: null, students: [] });
     const counts = new Map<string, { present: number; absent: number }>();
-    for (const record of records) {
+    for (const record of raw.records) {
       const current = counts.get(record.studentId) ?? { present: 0, absent: 0 };
-      if (record.status === "P") current.present += 1;
-      else current.absent += 1;
+      record.status === "P" ? (current.present += 1) : (current.absent += 1);
       counts.set(record.studentId, current);
     }
-    const riskRows = studentRows
-      .map((student) => {
-        const count = counts.get(student.id) ?? { present: 0, absent: 0 };
-        const recorded = count.present + count.absent;
-        const rawPercentage = attendancePercentage(count.present, recorded);
-        const percentage = rawPercentage === null ? null : Math.round(rawPercentage * 10) / 10;
-        const status = riskStatus(rawPercentage, subject.threshold);
-        return {
-          ...student,
-          present: count.present,
-          absent: count.absent,
-          recorded,
-          percentage,
-          status,
-          recoveryClasses: recoveryClasses(count.present, recorded, subject.threshold),
-        };
-      })
-      .sort(compareRisk);
-    const summary = {
-      totalStudents: riskRows.length,
-      atRisk: riskRows.filter((student) => student.status === "AT_RISK").length,
-      watch: riskRows.filter((student) => student.status === "WATCH").length,
-      safe: riskRows.filter((student) => student.status === "SAFE").length,
-      noData: riskRows.filter((student) => student.status === "NO_DATA").length,
-      classAverage:
-        riskRows.filter((student) => student.percentage !== null).length > 0
-          ? Math.round(
-              (riskRows.reduce((sum, student) => sum + (student.percentage ?? 0), 0) /
-                riskRows.filter((student) => student.percentage !== null).length) *
-                10,
-            ) / 10
-          : null,
-    };
-    return ok({ subjects: allSubjects, selectedSubject: subject, summary, students: riskRows });
+    const threshold = raw.selectedSubject.attendanceThreshold;
+    const rows = raw.students.map((student: any) => {
+      const count = counts.get(student._id) ?? { present: 0, absent: 0 };
+      const recorded = count.present + count.absent;
+      const rawPercentage = attendancePercentage(count.present, recorded);
+      return { id: student._id, rollNumber: student.rollNumber, name: student.name, email: student.email, present: count.present, absent: count.absent, recorded, percentage: rawPercentage === null ? null : Math.round(rawPercentage * 10) / 10, status: riskStatus(rawPercentage, threshold), recoveryClasses: recoveryClasses(count.present, recorded, threshold) };
+    }).sort(compareRisk);
+    const measured = rows.filter((row: any) => row.percentage !== null);
+    const summary = { totalStudents: rows.length, atRisk: rows.filter((row: any) => row.status === "AT_RISK").length, watch: rows.filter((row: any) => row.status === "WATCH").length, safe: rows.filter((row: any) => row.status === "SAFE").length, noData: rows.filter((row: any) => row.status === "NO_DATA").length, classAverage: measured.length ? Math.round((measured.reduce((sum: number, row: any) => sum + row.percentage, 0) / measured.length) * 10) / 10 : null };
+    return ok({ subjects, selectedSubject: subjects.find((subject: any) => subject.id === raw.selectedSubject._id), summary, students: rows });
   } catch (error) {
+    if (error instanceof Error && error.message.includes("SUBJECT_NOT_FOUND")) return fail("SUBJECT_NOT_FOUND", "Subject not found.", 404);
     return handleRouteError(error);
   }
 }

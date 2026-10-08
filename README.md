@@ -1,9 +1,15 @@
 # Attendly Backend
 
-TypeScript API for validating student and attendance workbooks, storing normalized attendance in Convex, and ranking students by attendance risk.
+TypeScript API for validating student, attendance, and marks workbooks, storing normalized records in Convex, and ranking students by attendance and academic risk.
 
 The current deliverable is intentionally backend-first. Start with [the documentation index](docs/README.md). AI coding agents must also read [AGENTS.md](AGENTS.md) and [the agent guide](docs/agent-guide.md).
 
-## Important status
+## Quick start
 
-Convex is the required datastore. The current persistence adapter still needs to be migrated to Convex before the backend is runnable; this is recorded explicitly in the collaborator documentation. Do not deploy until that migration and its smoke tests are complete.
+```powershell
+npm install
+npx convex dev
+npm run dev
+```
+
+Set the same `CONVEX_BACKEND_SECRET` in the local Next.js environment and the Convex deployment. Then call `POST /api/session/demo` to obtain the demo cookie. See [docs/development.md](docs/development.md) for the complete setup.
