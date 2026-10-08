@@ -209,6 +209,7 @@ export default function AdminDashboard({
         </div>
       </Card>
 
+      {/* Temporarily hidden for the showcase; retain this block for restoring Calendar integration.
       <Card padded={false}>
         <CardHeader
           title="Appointment scheduling"
@@ -223,6 +224,7 @@ export default function AdminDashboard({
           <div className="row-between"><p className="small muted">Connect your Google Calendar to check teaching commitments and add consultation events.</p><button className="btn btn-sm" type="button" onClick={()=>signIn('google-professor')}>Connect Google Calendar</button></div>
         </div>
       </Card>
+      */}
 
       {tab === "imports" ? <Card padded={false}>
         <CardHeader title="Subjects" subtitle="Add a subject before importing its attendance and test results." />
