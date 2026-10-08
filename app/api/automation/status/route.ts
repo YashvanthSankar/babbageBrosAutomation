@@ -3,6 +3,7 @@ import {getSession,requireAdmin} from '@/lib/session';
 import {convexApi,convexClient,convexSecret} from '@/lib/convex';
 import {demoEmailRecipient,demoVoiceRecipient,liveDemoAutomationsEnabled} from '@/lib/automation/mode';
 import {isIndianE164Phone} from '@/lib/voice/omnidim';
+import {weeklyReadiness} from '@/lib/email/weekly';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -26,7 +27,7 @@ export async function GET(){
       email:{configured:emailConfigured,testRecipientConfigured:emailTestRecipientConfigured,liveAllowed:liveDemo&&emailConfigured&&emailTestRecipientConfigured},
       voice:{configured:voiceConfigured,testRecipientConfigured:voiceTestRecipientConfigured,liveAllowed:liveDemo&&voiceConfigured&&voiceTestRecipientConfigured},
       calendar:{connected:calendarConfigured},
-      weeklySummary:{configured:false},
+       weeklySummary:weeklyReadiness(),
     });
   });
 }

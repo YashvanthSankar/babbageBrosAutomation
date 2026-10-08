@@ -53,7 +53,7 @@ function configured(): { apiKey: string; from: string } {
   return { apiKey, from };
 }
 
-function demoBody(recipient: string, attendancePercentage: number): string {
+function demoBody(attendancePercentage: number): string {
   return [
     'This is a synthetic demo email from the professor demo-send endpoint.',
     'It does not reference any real student, roster or contact.',
@@ -65,7 +65,8 @@ function demoBody(recipient: string, attendancePercentage: number): string {
 }
 
 /**
- * Send exactly one synthetic demo email to the professor-entered address.
+ * Low-level Resend adapter. Caller must enforce server-pinned recipient and
+ * Convex-backed daily claim; never invoke directly from a request body.
  * The provider response body is never relayed verbatim.
  */
 export async function dispatchDemoAttendanceEmail(input: DemoEmailInput): Promise<{ id: string | null }> {
@@ -90,7 +91,7 @@ export async function dispatchDemoAttendanceEmail(input: DemoEmailInput): Promis
         from,
         to: [to],
         subject: `[Synthetic demo] Attendance context ${input.attendancePercentage}%`,
-        text: demoBody(to, input.attendancePercentage),
+        text: demoBody(input.attendancePercentage),
       }),
       cache: 'no-store',
       signal: AbortSignal.timeout(TIMEOUT_MS),

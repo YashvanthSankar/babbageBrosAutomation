@@ -22,6 +22,7 @@ const riskRank: Record<string, number> = { high: 0, warn: 1, ok: 2, unknown: 3 }
 type DemoEmailResponse = {
   email?: {
     dispatched?: boolean;
+    simulated?: boolean;
     attendancePercentage?: number;
   };
 };
@@ -123,24 +124,17 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
 }
 
 function DemoEmailCard() {
-  const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
   async function dispatchDemoEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const recipient = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
-      setState("error");
-      setMessage("Enter a valid email address.");
-      return;
-    }
     setState("pending");
     setMessage(null);
-    const result = await apiPostJson<DemoEmailResponse>("/api/email/demo-send", { email: recipient });
+    const result = await apiPostJson<DemoEmailResponse>("/api/email/demo-send", {});
     if (result.ok) {
       setState("success");
-      setMessage(`Demo email dispatched to ${recipient} with 69% attendance context.`);
+      setMessage(result.data?.email?.simulated ? "Demo email simulated; nothing was sent. See the activity feed." : "Synthetic demo email accepted for the server-pinned test inbox (delivery not verified).");
     } else {
       setState("error");
       setMessage(result.error ?? "Could not send the demo email.");
@@ -148,13 +142,12 @@ function DemoEmailCard() {
   }
 
   return <Card padded={false} className="demo-email-card">
-    <CardHeader title="Email yourself a demo warning" subtitle="Send the synthetic attendance-risk message a student at 69% attendance would receive." actions={<Badge tone="accent">69% attendance</Badge>} />
+    <CardHeader title="Preview a demo warning" subtitle="Synthetic 69% attendance example. Simulated unless live testing is enabled on the server." actions={<Badge tone="accent">69% attendance</Badge>} />
     <div className="card-body">
       <form className="demo-email-form" onSubmit={dispatchDemoEmail}>
-        <label className="field demo-email-field"><span className="field-label">Your email address</span><input className="input" type="email" inputMode="email" autoComplete="email" placeholder="you@institute.edu" value={email} onChange={event => { setEmail(event.target.value); if (state !== "idle") { setState("idle"); setMessage(null); } }} disabled={state === "pending"} required /></label>
-        <button className="btn btn-primary demo-email-button" type="submit" disabled={state === "pending"}>{state === "pending" ? "Sending…" : "Email me the demo warning"}</button>
+        <button className="btn btn-primary demo-email-button" type="submit" disabled={state === "pending"}>{state === "pending" ? "Running…" : "Run demo warning"}</button>
       </form>
-      <p className="field-hint demo-email-note">Only fixed synthetic 69% attendance context is sent to the address entered here. No roster lookup or student contact data is used.</p>
+      <p className="field-hint demo-email-note">One run per UTC day. Live delivery goes only to a consenting server-pinned inbox; never to a typed address or an uploaded student contact.</p>
       {message ? <div className={`demo-email-result ${state === "error" ? "error" : "success"}`} role={state === "error" ? "alert" : "status"}>{message}</div> : null}
     </div>
   </Card>;

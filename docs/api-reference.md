@@ -94,7 +94,7 @@ Professor-only provider readiness: Convex, simulation/live mode, Resend, OmniDim
 
 ### `GET /api/automation/activity`
 
-Professor-only recent notification events, including whether an event was simulated or accepted by a configured provider.
+Professor-only recent notification and aggregate events, including whether an action was simulated, accepted by a provider, or failed. Aggregate events show counts, not student identities.
 
 ### `POST /api/voice/call`
 
@@ -102,7 +102,15 @@ Professor-only JSON `{ "studentId": "...", "subjectId": "..." }`. The service ch
 
 ### `POST /api/email/demo-send`
 
-Professor-only JSON `{ "email": "you@example.com" }`. Sends one clearly labeled synthetic warning with fixed 69% attendance context only to the entered address. It performs no roster lookup. Sends are limited to one per address every 10 minutes and 30 per server hour.
+Professor-only JSON `{}`. Simulates a fixed synthetic 69% warning by default; live testing requires `DEMO_LIVE_AUTOMATIONS=true`, Resend configuration and a consenting `DEMO_AUTOMATION_EMAIL` on the server. An optional `email` field must match that server-pinned address; arbitrary recipients are rejected. A durable Convex claim limits the action to one attempt per professor per UTC day, even across VPS restarts. Provider acceptance does not confirm inbox delivery.
+
+### `POST /api/automation/weekly`
+
+Professor-only JSON `{}`. Returns `{week, counts: {totalStudents, atRiskStudents, subjects}, results}`. Computes counts inside Convex, records at most one weekly digest and (if an adviser is configured and anyone is at risk) one adviser escalation per ISO week. Simulates by default. Optional live messages contain fixed synthetic text only and go solely to the server-pinned consenting inbox; adviser live testing additionally requires `FACULTY_ADVISER_EMAIL` to match that inbox. A failed attempt is recorded and not automatically retried in the same week.
+
+### `POST /api/automation/weekly/cron`
+
+Same workflow, but authenticates with `Authorization: Bearer <CRON_SECRET>` instead of a professor session and uses only the server-configured `PROFESSOR_EMAIL`. A missing secret returns 503 and an invalid secret returns 401. Run from a private VPS cron job; this route does not create a schedule itself.
 
 ## Common error codes
 

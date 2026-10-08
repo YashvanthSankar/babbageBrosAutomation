@@ -31,6 +31,7 @@ The goal is not to replace a professor’s judgment. It is to make important sig
 - Upload CSV for each record type; roster, attendance, and marks also accept Excel. Excel marks require a test name, date, and maximum score.
 - See students ordered by risk, with attendance, recovery classes, latest marks, and score movement together.
 - Review deduplicated post-import email/call activity; public mode is simulated, while optional live tests are pinned to consenting test contacts.
+- Run an ISO-week-deduplicated cohort digest and conditional adviser escalation manually; optionally schedule it with authenticated VPS cron. The activity feed records aggregate counts and actual send status.
 
 ### For students
 
@@ -72,10 +73,12 @@ Zapier and n8n are useful tools, and they are excellent for connecting existing 
 - **The data has to be right before action is taken.** Roster matching, date-column attendance sheets, marks validation, correction, and atomic confirmation are domain rules—not just steps between two APIs.
 - **The calculation must be inspectable.** The same subject-level records power the risk table, recovery count, student view, and notification facts. There is one calculation to audit instead of separate copies hidden in workflow nodes.
 - **The application scopes data by session.** Faculty operations are separated from student views; student requests resolve records from the signed-in email on the server. Demo credentials are not identity verification (see the security note below).
-- **Automation must be safe to retry.** Imports, notification claims, and bookings have explicit uniqueness or collision checks, so retries are not treated as new evidence or a new appointment.
+- **Automation must be safe to retry.** Imports, notification claims, weekly runs, and bookings have explicit uniqueness or collision checks, so retries are not treated as new evidence or a new appointment.
 - **People need a usable interface.** A professor sees row-level upload errors and a clear risk explanation; a student sees a personal explanation and a next step. Neither audience should have to inspect an automation editor.
 
 We chose application code for the rules, permissions, and student/faculty experience, while using dedicated services where they fit: Convex for shared persistence, Resend for email delivery, OmniDimension for voice, and Google Calendar when professor authorization is configured. This keeps the critical decisions close to the data and makes each step testable.
+
+**Where Zapier, n8n, and Make fit:** These are capable workflow orchestrators, especially when an organization already has a trusted student system. We chose an application because this problem also needs roster-first validation, atomic correction/re-import, session-scoped student views, inspectable attendance math, collision-safe booking, and one risk model reused by the UI and triggers. A visual workflow would still need a trusted backend and persistent state for those rules. The tradeoff is that we own more code and operations. We do **not** claim our app is inherently faster, cheaper, safer, or more reliable than those platforms; production use would need verified authentication and delivery monitoring. See [the decision matrix](docs/workflow-choice.md).
 
 ## What is implemented—and what still needs provider setup
 
@@ -88,8 +91,8 @@ We want the demo to be credible, so we distinguish working application behavior 
 | Professor/student dashboards | Implemented with server-side role and student-record scoping. |
 | Appointment booking | In-app reservations and collision rejection were tested. Google Calendar synchronization is optional and requires a configured dedicated demo Google account, web OAuth credentials, and that account's consent; do not assume it is connected in a demo. |
 | Voice | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned test number and fixed synthetic context. |
-| Email | Attendance/marks imports create deduplicated warning activity. Public mode simulates; explicitly enabled live tests go only to the server-pinned test inbox. A separate professor-only control can send a fixed synthetic 69% warning to an address entered explicitly for the demo. |
-| Weekly summary | Not implemented in this competition version. |
+| Email | Attendance/marks imports create deduplicated warning activity. A manual synthetic warning demo is limited to once per UTC day with a durable claim; public mode simulates. Explicitly enabled live tests go only to the server-pinned consenting inbox with fixed synthetic content. Live inbox receipt has not been verified. |
+| Weekly summary and adviser escalation | Implemented as professor-triggered, ISO-week-deduplicated aggregate actions. Scheduled runs require `CRON_SECRET` and an external VPS cron entry; none is installed automatically. Adviser action requires a configured adviser email and at-risk students. Public mode simulates; optional live test delivery is pinned to a consenting test inbox, and adviser live testing requires that inbox to equal the configured adviser email. |
 | Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Hosted on the VPS. |
 
 ## A judge’s two-minute walkthrough
@@ -99,7 +102,7 @@ We want the demo to be credible, so we distinguish working application behavior 
 3. Open the risk-ranked student list. Pick a student below threshold and inspect the attendance arithmetic, recovery count, and marks trend.
 4. Sign out and sign in with that roster-listed student’s institute email. Confirm that only their records appear.
 5. Book an appointment and show the result. If Google Calendar is not connected, describe it accurately as an in-app reservation—not a Google event.
-6. Open Automations to show notification activity. Public mode marks events simulated; a provider-accepted pinned test does not prove an email was read or a call answered.
+6. Open Automations to show notification activity, run the weekly summary, and inspect aggregate counts. Public mode marks events simulated; a provider-accepted pinned test does not prove an email was read or a call answered.
 
 **Demo security:** sign-in accepts any non-empty password and does not verify identity. Anyone can impersonate the configured professor or a student account. This is not production authentication or a secure store for real records. Use synthetic student names, emails, phone numbers, attendance, and marks only.
 

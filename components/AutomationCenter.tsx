@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiGet } from "./api";
+import { apiGet, apiPostJson } from "./api";
 import { Alert, Badge, Card, CardHeader, EmptyState, Spinner } from "./ui";
 
 type ProviderState = {
@@ -16,7 +16,7 @@ type AutomationStatus = {
   email: ProviderState;
   voice: ProviderState;
   calendar: { connected: boolean };
-  weeklySummary: { configured: boolean };
+  weeklySummary: { cronConfigured: boolean; liveSummaryAllowed: boolean; liveAdviserAllowed: boolean; adviserConfigured: boolean };
 };
 
 type ActivityEvent = {
@@ -56,6 +56,9 @@ function downloadCsv(filename: string, contents: string) {
 }
 
 function providerLabel(provider: string): string {
+  if (provider === "weekly_summary") return "Weekly cohort summary";
+  if (provider === "adviser_alert") return "Faculty adviser alert";
+  if (provider === "manual_demo_email") return "Manual demo warning";
   if (provider.includes("omnidim")) return "Voice call · OmniDimension";
   if (provider.includes("resend")) return "Warning email · Resend";
   return provider;
@@ -87,6 +90,8 @@ export default function AutomationCenter({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [runningWeekly, setRunningWeekly] = useState(false);
+  const [weeklyMessage, setWeeklyMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setRefreshing(true);
@@ -107,6 +112,14 @@ export default function AutomationCenter({
     const timer = window.setInterval(() => void refresh(true), 15_000);
     return () => window.clearInterval(timer);
   }, [refresh]);
+
+  async function runWeekly() {
+    setRunningWeekly(true);
+    const result = await apiPostJson<{week:string;counts:{totalStudents:number;atRiskStudents:number};results:Record<string,string>}>("/api/automation/weekly", {});
+    setRunningWeekly(false);
+    setWeeklyMessage(result.ok && result.data ? `${result.data.week}: ${result.data.counts.atRiskStudents} of ${result.data.counts.totalStudents} students at risk. Summary: ${result.data.results.weekly_summary}; adviser: ${result.data.results.adviser_alert}.` : result.error ?? "Could not run summary.");
+    if (result.ok) void refresh(true);
+  }
 
   return (
     <div className="stack automation-center" style={{ gap: 18 }}>
@@ -186,11 +199,15 @@ export default function AutomationCenter({
           title="Weekly summary"
           provider="Scheduled digest"
           loading={loading}
-          ready={Boolean(status?.weeklySummary.configured)}
-          value={status?.weeklySummary.configured ? "Configured" : "Not available"}
-          detail="A recurring weekly summary job is not part of this demo build."
-        />
-      </div>
+           ready={Boolean(status?.weeklySummary.cronConfigured)}
+           value={status?.weeklySummary.cronConfigured ? "Cron ready" : "Manual run available"}
+           detail="Aggregate counts only. Weekly runs are recorded once per ISO week; public mode simulates email. Scheduling requires VPS cron and CRON_SECRET."
+         />
+       </div>
+
+       <Card padded={false}><CardHeader title="Weekly support summary" subtitle="Run an idempotent cohort digest; adviser escalation is recorded when a configured adviser and at-risk students exist." />
+         <div className="card-body stack"><button className="btn" type="button" disabled={runningWeekly} onClick={() => void runWeekly()}>{runningWeekly ? "Running…" : "Run this week's summary"}</button>
+           {weeklyMessage ? <p className="small" role="status">{weeklyMessage}</p> : null}</div></Card>
 
       <Card padded={false}>
         <CardHeader

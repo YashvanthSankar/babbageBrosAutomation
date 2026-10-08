@@ -32,3 +32,51 @@ export const riskTargets = query({args:{secret:v.string(),professorEmail:v.strin
  if((percentage!==null&&percentage<subject.attendanceThreshold)||marksRisk)targets.push({studentId:student._id,subjectId:subject._id,name:student.name,email:student.email,phone:student.phone,subjectName:subject.name,present,total,attendancePercentage:percentage,threshold:subject.attendanceThreshold,classesToRecover:total?Math.max(0,Math.ceil((subject.attendanceThreshold*total-100*present)/(100-subject.attendanceThreshold))):0,latestScore:latest,previousScore:previous,marksRisk});
  }}return targets;
 }});
+
+/** Aggregate counts only. No student identities or contact details leave Convex. */
+export const cohortCounts = query({args:{secret:v.string(),professorEmail:v.string()},handler:async(ctx,args)=>{
+ authorize(args.secret);
+ const teacher=await ctx.db.query('teachers').withIndex('by_email',q=>q.eq('email',args.professorEmail)).unique();
+ if(!teacher)return {totalStudents:0,atRiskStudents:0,subjects:0};
+ const [students,subjects]=await Promise.all([
+  ctx.db.query('students').withIndex('by_teacher',q=>q.eq('teacherId',teacher._id)).collect(),
+  ctx.db.query('subjects').withIndex('by_teacher',q=>q.eq('teacherId',teacher._id)).collect(),
+ ]);
+ const active=students.filter(s=>s.active);const risky=new Set<string>();
+ for(const subject of subjects){
+  const [attendance,marks,assessments]=await Promise.all([
+   ctx.db.query('attendanceRecords').withIndex('by_subject',q=>q.eq('subjectId',subject._id)).collect(),
+   ctx.db.query('marksRecords').withIndex('by_subject',q=>q.eq('subjectId',subject._id)).collect(),
+   ctx.db.query('assessments').withIndex('by_subject',q=>q.eq('subjectId',subject._id)).collect(),
+  ]);
+  const dates=new Map(assessments.map(a=>[String(a._id),a.assessmentDate]));
+  for(const student of active){
+   const rows=attendance.filter(a=>a.studentId===student._id);
+   const lowAttendance=rows.length>0 && rows.filter(a=>a.status==='P').length/rows.length*100<subject.attendanceThreshold;
+   const scores=marks.filter(m=>m.studentId===student._id).sort((a,b)=>(dates.get(String(b.assessmentId))??'').localeCompare(dates.get(String(a.assessmentId))??''));
+   const latest=scores[0]?.percentage,previous=scores[1]?.percentage;
+   if(lowAttendance || (latest!==undefined && (latest<subject.marksThreshold || (previous!==undefined && previous-latest>=10))))risky.add(String(student._id));
+  }
+ }
+ return {totalStudents:active.length,atRiskStudents:risky.size,subjects:subjects.length};
+}});
+
+/** Atomic, professor-scoped at-most-once claim, also survives VPS restarts. */
+export const claimAggregate = mutation({args:{secret:v.string(),professorEmail:v.string(),key:v.string(),kind:v.string(),totalStudents:v.number(),atRiskStudents:v.number()},handler:async(ctx,args)=>{
+ authorize(args.secret);
+ const teacher=await ctx.db.query('teachers').withIndex('by_email',q=>q.eq('email',args.professorEmail)).unique();
+ if(!teacher)throw new Error('FORBIDDEN');
+ const key=`${args.professorEmail}:${args.key}`;
+ const existing=await ctx.db.query('aggregateEvents').withIndex('by_key',q=>q.eq('key',key)).unique();
+ if(existing)return null;
+ return ctx.db.insert('aggregateEvents',{professorEmail:args.professorEmail,key,kind:args.kind,status:'pending',createdAt:Date.now(),totalStudents:args.totalStudents,atRiskStudents:args.atRiskStudents});
+}});
+export const finishAggregate = mutation({args:{secret:v.string(),professorEmail:v.string(),id:v.id('aggregateEvents'),status:v.union(v.literal('simulated'),v.literal('dispatched'),v.literal('failed'))},handler:async(ctx,args)=>{
+ authorize(args.secret);const event=await ctx.db.get(args.id);
+ if(!event||event.professorEmail!==args.professorEmail||event.status!=='pending')throw new Error('FORBIDDEN');
+ await ctx.db.patch(args.id,{status:args.status,...(args.status==='dispatched'?{sentAt:Date.now()}:{})});
+}});
+export const recentAggregates = query({args:{secret:v.string(),professorEmail:v.string()},handler:async(ctx,args)=>{
+ authorize(args.secret);
+ return (await ctx.db.query('aggregateEvents').withIndex('by_professor',q=>q.eq('professorEmail',args.professorEmail)).order('desc').take(30)).map(e=>({id:e._id,provider:e.kind,status:e.status,createdAt:e.createdAt,sentAt:e.sentAt??null,studentName:`${e.atRiskStudents} of ${e.totalStudents} students at risk`,subjectName:'Aggregate only'}));
+}});

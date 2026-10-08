@@ -12,6 +12,7 @@ export default defineSchema({
   calendarTokens: defineTable({ professorEmail:v.string(), encrypted:v.string() }).index('by_professor',['professorEmail']),
   bookings: defineTable({professorEmail:v.string(),studentId:v.id('students'),subjectId:v.id('subjects'),start:v.string(),end:v.string(),status:v.string(),googleEventId:v.optional(v.string())}).index('by_professor',['professorEmail']),
   notificationEvents: defineTable({professorEmail:v.string(),studentId:v.id('students'),subjectId:v.id('subjects'),key:v.string(),provider:v.string(),status:v.string(),sentAt:v.optional(v.number())}).index('by_key',['key']).index('by_professor',['professorEmail']),
+  aggregateEvents: defineTable({professorEmail:v.string(),key:v.string(),kind:v.string(),status:v.string(),createdAt:v.number(),sentAt:v.optional(v.number()),totalStudents:v.number(),atRiskStudents:v.number()}).index('by_key',['key']).index('by_professor',['professorEmail']),
   students: defineTable({
     teacherId: v.id("teachers"),
     rollNumber: v.string(),
