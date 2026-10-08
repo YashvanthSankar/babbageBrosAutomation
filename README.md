@@ -14,4 +14,3 @@ npm run dev
 ```
 
 Open `http://localhost:3000` and choose **Continue as demo teacher**.
-hi
