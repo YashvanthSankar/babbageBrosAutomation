@@ -7,7 +7,6 @@ import type { AdminDashboard as AdminData, Student, SubjectStat } from "./types"
 import {
   attendancePercent,
   formatPercent,
-  isSubjectAtRisk,
   riskStatTone,
   studentRiskBadge,
   subjectLabel,
@@ -20,17 +19,6 @@ import AutomationCenter from "./AutomationCenter";
 
 type Tab = "students" | "imports" | "automation";
 
-type CallStatus = {
-  state: "idle" | "pending" | "success" | "error";
-  message?: string;
-};
-
-type VoiceCallResponse = {
-  call?: {
-    status?: "dispatched" | "duplicate" | "not_at_risk";
-  };
-};
-
 export default function AdminDashboard({
   data,
   onChanged,
@@ -41,14 +29,15 @@ export default function AdminDashboard({
   const {data:session}=useSession();
   const [tab, setTab] = useState<Tab>("students");
   const [query, setQuery] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [riskFilter, setRiskFilter] = useState("all");
   const [ownedSubjects, setOwnedSubjects] = useState<SubjectStat[]>([]);
   const [subjectName, setSubjectName] = useState("");
   const [subjectCode, setSubjectCode] = useState("");
   const [department, setDepartment] = useState("");
   const [subjectError, setSubjectError] = useState<string | null>(null);
   const [savingSubject, setSavingSubject] = useState(false);
-  const [demoPhone, setDemoPhone] = useState("");
-  const [demoCallState, setDemoCallState] = useState<CallStatus>({ state: "idle" });
   useEffect(() => {
     apiGet<{ subjects: SubjectStat[] }>("/api/subjects").then((result) => {
       if (result.ok) setOwnedSubjects(result.data?.subjects ?? []);
@@ -59,27 +48,13 @@ export default function AdminDashboard({
     setSavingSubject(true);
     setSubjectError(null);
     const result = await apiPostJson<SubjectStat>("/api/subjects", {
-      name: subjectName.trim(), code: subjectCode.trim(), department: department.trim(), threshold: 85, attendanceThreshold: 85, marksThreshold: 50,
+      name: subjectName.trim(), code: subjectCode.trim(), department: department.trim(), threshold: 85, marksThreshold: 50,
     });
     setSavingSubject(false);
     if (!result.ok || !result.data) { setSubjectError(result.error ?? "Could not add subject."); return; }
     setOwnedSubjects((previous) => [...previous, result.data!]);
     setSubjectName(""); setSubjectCode(""); setDepartment("");
     onChanged();
-  }
-
-  async function dispatchDemoCall(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const phone = demoPhone.trim();
-    if (!/^\+91[6-9]\d{9}$/.test(phone)) {
-      setDemoCallState({ state: "error", message: "Enter an Indian number in +91 E.164 format." });
-      return;
-    }
-    setDemoCallState({ state: "pending" });
-    const result = await apiPostJson<{ call?: { attendancePercentage?: number } }>("/api/voice/demo-call", { phone });
-    setDemoCallState(result.ok
-      ? { state: "success", message: "Demo call dispatched with 69% attendance context." }
-      : { state: "error", message: result.error ?? "Could not dispatch the demo call." });
   }
 
   const students = data.students ?? [];
@@ -98,26 +73,52 @@ export default function AdminDashboard({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter((s) =>
-      [s.name, s.rollNo, s.email, s.department]
+    return students.filter((student) => {
+      const rows = student.subjects ?? [];
+      const subjectScopeMatches = rows.some((subject) =>
+        (subjectFilter === "all" || String(subject.id) === subjectFilter) &&
+        (departmentFilter === "all" || subject.department === departmentFilter),
+      );
+      const hasSubjectScope = subjectFilter !== "all" || departmentFilter !== "all";
+      const searchMatches = !q || [student.name, student.rollNo, student.email, ...rows.flatMap((subject) => [subject.name, subject.code, subject.department])]
         .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(q)),
-    );
-  }, [students, query]);
+        .some((field) => String(field).toLowerCase().includes(q));
+      return searchMatches && (!hasSubjectScope || subjectScopeMatches) &&
+        (riskFilter === "all" || String(student.riskLevel ?? "unknown").toLowerCase() === riskFilter);
+    });
+  }, [students, query, departmentFilter, riskFilter, subjectFilter]);
+
+  const departments = useMemo(
+    () => Array.from(new Set(subjects.map((subject) => subject.department).filter((value): value is string => Boolean(value)))).sort(),
+    [subjects],
+  );
+  const subjectRiskCounts = useMemo(() => subjects.map((subject) => {
+    const matching = students.filter((student) => (student.subjects ?? []).some((item) => String(item.id) === String(subject.id)));
+    return { subject, total: matching.length, atRisk: matching.filter((student) => (student.subjects ?? []).some((item) => String(item.id) === String(subject.id) && (item.atRisk || item.riskLevel === "high"))).length };
+  }), [students, subjects]);
+  const departmentRiskCounts = useMemo(() => departments.map((name) => {
+    const matching = students.filter((student) => (student.subjects ?? []).some((subject) => subject.department === name));
+    return { name, total: matching.length, atRisk: matching.filter((student) => (student.subjects ?? []).some((subject) => subject.department === name && (subject.atRisk || subject.riskLevel === "high"))).length };
+  }), [students, departments]);
 
   const professorLabel = data.professor?.name || data.professor?.email || "Professor";
 
   return (
     <div className="stack" style={{ gap: 24 }}>
       <div className="page-head">
-        <div className="row-between">
-          <div>
-            <h1>Professor dashboard</h1>
-            <p>
-              Signed in as <strong>{professorLabel}</strong>. Manage the roster, imports, and
-              attendance risk.
-            </p>
+          <div className="row-between dashboard-head-row">
+            <div>
+              <h1>Professor dashboard</h1>
+              <p>Welcome, <strong>{professorLabel}</strong>. Review student risk and take action.</p>
+            </div>
+            <div className="dashboard-head-actions">
+              <Badge tone={session?.user.hasCalendar ? "ok" : "neutral"}>
+                {session?.user.hasCalendar ? "Calendar connected" : "Calendar not connected"}
+              </Badge>
+              <button className="btn btn-sm" type="button" onClick={() => signIn("google-professor")}>
+                {session?.user.hasCalendar ? "Reconnect calendar" : "Connect Google Calendar"}
+              </button>
+            </div>
           </div>
           <div className="tabs" role="tablist" aria-label="Dashboard sections">
             <button
@@ -148,7 +149,6 @@ export default function AdminDashboard({
               Automation
             </button>
           </div>
-        </div>
       </div>
 
       {summary.students === 0 && tab === "students" ? (
@@ -163,7 +163,7 @@ export default function AdminDashboard({
         </Alert>
       ) : null}
 
-      <div className="stat-grid">
+      {tab === "students" ? <div className="stat-grid">
         <Stat label="Students" value={statStudents} hint="Rows in the professor roster" />
         <Stat
           label="At risk"
@@ -178,60 +178,7 @@ export default function AdminDashboard({
           tone={riskStatTone(summary.avgAttendance)}
           hint="Computed from imported attendance"
         />
-      </div>
-
-      <Card padded={false} className="demo-call-card">
-        <CardHeader
-          title="Call your number for example"
-          subtitle="Hear the attendance-risk agent as a student currently at 69% attendance."
-          actions={<Badge tone="danger">69% attendance</Badge>}
-        />
-        <div className="card-body">
-          <form className="demo-call-form" onSubmit={dispatchDemoCall}>
-            <label className="field demo-call-field">
-              <span className="field-label">Your phone number</span>
-              <input
-                className="input"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="+919876543210"
-                value={demoPhone}
-                onChange={(event) => {
-                  setDemoPhone(event.target.value);
-                  if (demoCallState.state !== "idle") setDemoCallState({ state: "idle" });
-                }}
-                disabled={demoCallState.state === "pending"}
-                required
-              />
-            </label>
-            <button className="btn btn-primary demo-call-button" type="submit" disabled={demoCallState.state === "pending"}>
-              {demoCallState.state === "pending" ? "Calling…" : "Call me with the demo agent"}
-            </button>
-          </form>
-          <p className="field-hint demo-call-note">Only the fixed synthetic attendance value is sent to the voice agent. Demo calls are rate-limited.</p>
-          {demoCallState.message ? (
-            <div className={`demo-call-result ${demoCallState.state === "error" ? "error" : "success"}`} role={demoCallState.state === "error" ? "alert" : "status"}>
-              {demoCallState.message}
-            </div>
-          ) : null}
-        </div>
-      </Card>
-
-      <Card padded={false}>
-        <CardHeader
-          title="Appointment scheduling"
-          subtitle="Students can request subject-specific advising appointments from available slots."
-          actions={<Badge tone="accent">{session?.user.hasCalendar?'Google Calendar connected':'In-app appointments'}</Badge>}
-        />
-        <div className="card-body stack" style={{ gap: 12 }}>
-          <Alert tone="info" title="Student appointments">
-            Students select a subject, date, and open appointment slot. The service checks slot
-            availability again when the booking is confirmed, preventing duplicate reservations.
-          </Alert>
-          <div className="row-between"><p className="small muted">Connect your Google Calendar to check teaching commitments and add consultation events.</p><button className="btn btn-sm" type="button" onClick={()=>signIn('google-professor')}>Connect Google Calendar</button></div>
-        </div>
-      </Card>
+      </div> : null}
 
       {tab === "imports" ? <Card padded={false}>
         <CardHeader title="Subjects" subtitle="Add a subject before importing its attendance and test results." />
@@ -247,32 +194,33 @@ export default function AdminDashboard({
         </div>
       </Card> : null}
       {tab === "students" ? (
+        <div className="stack" style={{ gap: 16 }}>
+        {(subjectRiskCounts.length > 0 || departmentRiskCounts.length > 0) ? <Card className="risk-breakdown-card">
+          <div className="risk-breakdown-grid">
+            {subjectRiskCounts.length > 0 ? <section><h2>Risk by subject</h2><p className="small muted">Students with attendance or marks concerns</p><div className="breakdown-chips">{subjectRiskCounts.map(({ subject, total, atRisk }) => <button key={String(subject.id)} className={`breakdown-chip ${subjectFilter === String(subject.id) ? "selected" : ""}`} type="button" onClick={() => setSubjectFilter(subjectFilter === String(subject.id) ? "all" : String(subject.id))}><span>{subject.code || subject.name}</span><strong>{atRisk} / {total} at risk</strong></button>)}</div></section> : null}
+            {departmentRiskCounts.length > 0 ? <section><h2>Risk by department</h2><p className="small muted">Students with a subject in this department</p><div className="breakdown-chips">{departmentRiskCounts.map(({ name, total, atRisk }) => <button key={name} className={`breakdown-chip ${departmentFilter === name ? "selected" : ""}`} type="button" onClick={() => setDepartmentFilter(departmentFilter === name ? "all" : name)}><span>{name}</span><strong>{atRisk} / {total} at risk</strong></button>)}</div></section> : null}
+          </div>
+        </Card> : null}
         <Card padded={false}>
           <CardHeader
             title="Roster & risk"
-            subtitle={`${filtered.length} of ${students.length} students`}
-            actions={
-              <div className="search-box">
-                <label className="sr-only" htmlFor="student-search">
-                  Search students
-                </label>
-                <input
-                  id="student-search"
-                  className="input"
-                  placeholder="Search name, roll no, email…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-            }
+            subtitle={`${filtered.length} of ${students.length} students · highest risk first`}
+            actions={<button className="btn btn-sm" type="button" onClick={() => setTab("imports")}>Upload records</button>}
           />
+          <div className="risk-filters">
+            <label className="field filter-search"><span className="field-label">Find a student</span><input id="student-search" className="input" placeholder="Name, roll number or email" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+            <label className="field"><span className="field-label">Subject</span><select className="input" value={subjectFilter} onChange={(event) => setSubjectFilter(event.target.value)}><option value="all">All subjects</option>{subjects.map((subject) => <option key={String(subject.id)} value={String(subject.id)}>{subjectLabel(subject)}</option>)}</select></label>
+            <label className="field"><span className="field-label">Department</span><select className="input" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}><option value="all">All departments</option>{departments.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label className="field"><span className="field-label">Risk status</span><select className="input" value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)}><option value="all">All risk levels</option><option value="high">At risk</option><option value="warn">Watch</option><option value="ok">On track</option><option value="unknown">No data</option></select></label>
+            {query || subjectFilter !== "all" || departmentFilter !== "all" || riskFilter !== "all" ? <button className="btn btn-ghost btn-sm clear-filters" type="button" onClick={() => { setQuery(""); setSubjectFilter("all"); setDepartmentFilter("all"); setRiskFilter("all"); }}>Clear filters</button> : null}
+          </div>
           {students.length === 0 ? (
             <EmptyState title="No students in the roster">
               Upload the roster CSV to populate this table.
             </EmptyState>
           ) : filtered.length === 0 ? (
             <EmptyState title="No matches">
-              No student matches “{query}”.
+              No students match these filters. Try clearing one or more filters.
             </EmptyState>
           ) : (
             <div className="table-wrap">
@@ -282,21 +230,21 @@ export default function AdminDashboard({
                     <th>Roll no</th>
                     <th>Student</th>
                     <th>Department</th>
-                    <th>Subjects &amp; attendance</th>
-                    <th>Overall</th>
-                    <th>Risk</th>
-                    <th>Actions</th>
+                    <th>Attendance &amp; marks</th>
+                    <th>Overall attendance</th>
+                    <th>Risk status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((student) => (
-                    <StudentRow key={String(student.id)} student={student} />
+                    <StudentRow key={String(student.id)} student={student} subjectFilter={subjectFilter} departmentFilter={departmentFilter} />
                   ))}
                 </tbody>
               </table>
             </div>
           )}
         </Card>
+        </div>
       ) : null}
       {tab === "imports" ? (
         <UploadsPanel subjects={subjects} studentsCount={students.length} onImported={onChanged} />
@@ -312,39 +260,14 @@ export default function AdminDashboard({
   );
 }
 
-function StudentRow({ student }: { student: Student }) {
+function StudentRow({ student, subjectFilter, departmentFilter }: { student: Student; subjectFilter: string; departmentFilter: string }) {
   const overall = overallAttendance(student.subjects ?? []);
   const risk = studentRiskBadge(student);
-  const [calls, setCalls] = useState<Record<string, CallStatus>>({});
-
-  async function callStudent(subject: SubjectStat) {
-    const key = String(subject.id);
-    setCalls((current) => ({ ...current, [key]: { state: "pending" } }));
-    const result = await apiPostJson<VoiceCallResponse>("/api/voice/call", {
-      studentId: String(student.id),
-      subjectId: key,
-    });
-    if (!result.ok) {
-      setCalls((current) => ({
-        ...current,
-        [key]: { state: "error", message: result.error ?? "Could not dispatch the call." },
-      }));
-      return;
-    }
-
-    const status = result.data?.call?.status;
-    const message = status === "duplicate"
-      ? "Already called for this attendance record."
-      : status === "not_at_risk"
-        ? "Attendance is no longer below the threshold."
-        : "Call dispatched.";
-    setCalls((current) => ({ ...current, [key]: { state: "success", message } }));
-  }
-
-  const attendanceRisks = (student.subjects ?? []).filter((subject) => {
-    const percent = attendancePercent(subject);
-    return percent !== null && percent < (subject.threshold ?? 85);
-  });
+  const visibleSubjects = (student.subjects ?? []).filter((subject) =>
+    (subjectFilter === "all" || String(subject.id) === subjectFilter) &&
+    (departmentFilter === "all" || subject.department === departmentFilter),
+  );
+  const departments = [...new Set(visibleSubjects.map((subject) => subject.department).filter((value): value is string => Boolean(value)))];
 
   return (
     <tr>
@@ -353,26 +276,41 @@ function StudentRow({ student }: { student: Student }) {
         <div className="cell-strong">{student.name ?? "Unnamed"}</div>
         <div className="small muted">{student.email ?? "—"}</div>
       </td>
-      <td>{student.department ?? "—"}</td>
+      <td>{departments.length ? departments.join(", ") : student.department ?? "—"}</td>
       <td>
-        {student.subjects && student.subjects.length > 0 ? (
-          <div className="chips">
-            {student.subjects.map((subject) => {
+        {visibleSubjects.length > 0 ? (
+          <div className="subject-insights">
+            {visibleSubjects.map((subject) => {
               const pct = attendancePercent(subject);
-              const tone = isSubjectAtRisk(subject) ? "danger" : "ok";
+              const attendanceLow = pct !== null && pct < (subject.threshold ?? 85);
+              const weakMarks = subject.latestScore !== null && subject.latestScore !== undefined && subject.latestScore < (subject.marksThreshold ?? 50);
+              const fallingMarks = subject.latestScore !== null && subject.latestScore !== undefined && subject.previousScore !== null && subject.previousScore !== undefined && subject.previousScore - subject.latestScore >= 10;
+              const reasons = [attendanceLow ? "Attendance below target" : null, weakMarks ? "Weak latest result" : null, fallingMarks ? "Marks falling" : null].filter(Boolean);
+              const change = subject.latestScore !== null && subject.latestScore !== undefined && subject.previousScore !== null && subject.previousScore !== undefined
+                ? subject.latestScore - subject.previousScore
+                : null;
               return (
-                <span
-                  key={String(subject.id)}
-                  className={`badge ${tone === "danger" ? "badge-danger" : "badge-ok"}`}
-                  title={`${subjectLabel(subject)} · ${formatPercent(pct)}`}
-                >
-                  {subject.code || subject.name || `#${subject.id}`} · {formatPercent(pct)}
-                </span>
+                <div className="subject-insight" key={String(subject.id)}>
+                  <div className="subject-insight-head">
+                    <strong>{subject.code || subject.name || `Subject ${subject.id}`}</strong>
+                    {pct === null ? <Badge tone="neutral">No attendance</Badge> : <Badge tone={reasons.length ? "danger" : subject.riskLevel === "warn" ? "warn" : "ok"}>{formatPercent(pct)}</Badge>}
+                  </div>
+                  <div className="small muted">
+                    {subject.total ? `${subject.attended ?? 0}/${subject.total} classes attended` : "No classes recorded"}
+                    {attendanceLow ? ` · Attend ${subject.classesToRecover ?? 0} in a row to recover` : ""}
+                  </div>
+                  <div className="small">
+                    {subject.latestScore === null || subject.latestScore === undefined
+                      ? "No test results yet"
+                      : `${subject.latestTestName || "Latest test"}: ${formatPercent(subject.latestScore)}${change === null ? "" : ` · ${change > 0 ? "+" : ""}${change.toFixed(1)} pp vs previous`}`}
+                  </div>
+                  {reasons.length ? <div className="subject-reasons">{reasons.map((reason) => <span key={reason}>{reason}</span>)}</div> : null}
+                </div>
               );
             })}
           </div>
         ) : (
-          <span className="muted small">No subject data</span>
+          <span className="muted small">No data for this subject</span>
         )}
       </td>
       <td style={{ minWidth: 130 }}>
@@ -390,41 +328,6 @@ function StudentRow({ student }: { student: Student }) {
           <span className="dot" aria-hidden />
           {risk.label}
         </Badge>
-      </td>
-      <td>
-        {attendanceRisks.length > 0 ? (
-          <div className="call-actions">
-            {attendanceRisks.map((subject) => {
-              const key = String(subject.id);
-              const call = calls[key] ?? { state: "idle" as const };
-              const complete = call.state === "success";
-              return (
-                <div className="call-action" key={key}>
-                  <button
-                    className="btn btn-sm"
-                    type="button"
-                    disabled={call.state === "pending" || complete}
-                    onClick={() => callStudent(subject)}
-                    aria-label={`Call ${student.name ?? "student"} about ${subjectLabel(subject)}`}
-                  >
-                    {call.state === "pending" ? "Calling…" : complete ? "Called" : "Call student"}
-                    <span className="mono call-subject">{subject.code || subject.name}</span>
-                  </button>
-                  {call.message ? (
-                    <span
-                      className={`call-status ${call.state === "error" ? "call-status-error" : ""}`}
-                      role={call.state === "error" ? "alert" : "status"}
-                    >
-                      {call.message}
-                    </span>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <span className="muted small">—</span>
-        )}
       </td>
     </tr>
   );

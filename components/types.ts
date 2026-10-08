@@ -19,6 +19,7 @@ export type SubjectStat = {
   code?: string;
   name?: string;
   department?: string | null;
+  marksThreshold?: number;
   attended?: number;
   total?: number;
   attendancePercent?: number | null;
@@ -53,6 +54,7 @@ export type AdminDashboard = {
   role: "admin";
   professor?: Professor;
   stats?: AdminStats;
+  subjects?: SubjectStat[];
   students?: Student[];
 };
 

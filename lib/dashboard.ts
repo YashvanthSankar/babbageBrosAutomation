@@ -4,10 +4,11 @@ import { studentRow, type StudentRow } from './roster';
 import { computeTrend, overallRisk, recoveryClasses, type RiskLevel, type Trend } from './risk';
 
 export interface DashboardSubject {
-  id: string; code: string; name: string; attended: number; total: number;
+  id: string; code: string; name: string; department: string | null;
+  attended: number; total: number;
   attendancePercent: number | null; classesToRecover: number;
   latestScore: number | null; previousScore: number | null; latestTestName: string | null;
-  trend: Trend; atRisk: boolean; riskLevel: RiskLevel; threshold: number;
+  trend: Trend; atRisk: boolean; riskLevel: RiskLevel; threshold: number; marksThreshold: number;
 }
 export interface DashboardStudent {
   id: string; name: string; rollNo: string; email: string; department: string | null;
@@ -48,14 +49,18 @@ function buildStudent(student: StudentRow, snapshot: WorkspaceSnapshot): Dashboa
       : percentage === null && latestScore === null ? 'unknown' : 'ok';
     return {
       id: subject._id, code: subject.code ?? subject.name, name: subject.name, attended, total,
+      department: subject.department ?? null,
       attendancePercent: percentage === null ? null : round(percentage),
       classesToRecover: recoveryClasses(attended,total,threshold), latestScore, previousScore,
       latestTestName: latest?.assessment?.name ?? null, trend,
       atRisk: attendanceAtRisk || weakMarks || fallingMarks, riskLevel, threshold,
+      marksThreshold: subject.marksThreshold ?? 50,
     };
   });
   return { id: student.id, name: student.name, rollNo: student.roll_no, email: student.email,
-    department: snapshot.subjects.find(row => row.department)?.department ?? null,
+    department: [...new Set(subjects.map(subject => subject.department).filter((value): value is string => Boolean(value)))].length === 1
+      ? subjects.find(subject => subject.department)?.department ?? null
+      : null,
     subjects, riskLevel: overallRisk(subjects.map(subject => subject.riskLevel)) };
 }
 
@@ -68,7 +73,7 @@ export async function getAdminDashboard(professorEmail: string): Promise<AdminDa
     || a.name.localeCompare(b.name));
   return { role:'admin', professor:{email:professorEmail,name:snapshot.teacher?.name ?? null},
     stats:{students:students.length,subjects:snapshot.subjects.length,atRisk:students.filter(s=>s.riskLevel==='high').length},
-    subjects:snapshot.subjects.map(s=>({id:s._id,name:s.name,code:s.code ?? s.name})), students };
+     subjects:snapshot.subjects.map(s=>({id:s._id,name:s.name,code:s.code ?? s.name,department:s.department ?? null,threshold:s.attendanceThreshold ?? 85,marksThreshold:s.marksThreshold ?? 50})), students };
 }
 export async function getStudentDashboard(student: StudentRow): Promise<StudentDashboard> {
   const snapshot = await workspaceSnapshot(student.professor_email);
