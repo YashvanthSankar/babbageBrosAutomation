@@ -16,7 +16,29 @@
 
 [![Watch the Student Success demo video: records to risk to support](media/student-success-demo-poster.jpg)](https://github.com/YashvanthSankar/babbageBrosAutomation/blob/main/media/student-success-demo.mp4)
 
-**[▶ Play on Google Drive](https://drive.google.com/file/d/19jopIIb_om1eBuyqnCYHLwsilI91GU4B/view?usp=sharing)** · **[↓ Direct MP4 download](https://raw.githubusercontent.com/YashvanthSankar/babbageBrosAutomation/main/media/student-success-demo.mp4)**. This 1080p, 1-minute-32-second narrated tour uses a real capture of the public landing page and the real dashboard interface with **synthetic, intercepted data**—not live student records or a completed provider send. Hosted weekly execution and Google Calendar remain unverified end to end. See [the verification audit](docs/progress/2026-10-09-integration-audit.md).
+**[▶ Play on Google Drive](https://drive.google.com/file/d/19jopIIb_om1eBuyqnCYHLwsilI91GU4B/view?usp=sharing)** · **[↓ Direct MP4 download](https://raw.githubusercontent.com/YashvanthSankar/babbageBrosAutomation/main/media/student-success-demo.mp4)**. This 1080p, 1-minute-32-second narrated tour uses a real capture of the public landing page and the real dashboard interface with **synthetic, intercepted data**—not live student records or a completed provider send. The booking screenshots below are separate, later evidence; they are **not footage from the video**.
+
+## What we built
+
+- **A working faculty-to-student product, not just an automation diagram.** Faculty can define subjects and thresholds, import records and investigate risk; students can see their own progress and reserve a consultation. The demo is public, but its password-only identity check is **not suitable for real student data**.
+- **Correctable academic records.** CSV/XLSX ingestion validates roster identities and class dates, explains row errors, and commits staged batches atomically. Re-imports correct existing attendance and marks instead of double-counting them.
+- **Risk with an explanation and a next step.** Attendance shortfalls produce a precise consecutive-classes-to-recover count; normalized assessments expose weak and falling scores. The dashboard connects the signal to a bookable slot.
+- **Accountable, guarded automation.** Post-import email/call activity and weekly cohort/adviser jobs use durable deduplication claims and visible status. Public email/calls are simulated; optional live tests use only consenting, server-pinned destinations. A weekly cron schedule and external delivery are **not verified**.
+- **An optional Calendar bridge.** The code supports professor-consented FreeBusy and Google event creation. The two redacted demo screenshots below show a confirmed in-app booking and a matching Google Calendar event; they do **not** establish an independently reproduced hosted OAuth/availability test.
+
+### Booking → Calendar: demo screenshots
+
+The user-provided captures show **Friday, 9 October, 9:30–10:00 AM**: the app confirms a consultation slot and Google Calendar displays a corresponding *Student consultation: Data Structures & Algorithms (Demo)* event. The Calendar image says **one guest awaiting**—not that the invitation was accepted. The guest identity and internal booking ID were removed before publication.
+
+**1. Booking confirmed in the app**
+
+![Student Success appointment selection and booking confirmation for 9:30–10:00 AM; booking ID removed](media/calendar-booking-confirmation.jpg)
+
+**2. Matching event visible in Google Calendar**
+
+<img src="media/google-calendar-demo-event.jpg" alt="Google Calendar demo consultation event at 9:30–10:00 AM, with one guest awaiting; guest details cropped for privacy" width="350">
+
+These are visual evidence supplied for the demo, **not** a logged test of OAuth consent, FreeBusy conflict handling, repeatability, or invitation delivery. The video above used synthetic intercepted dashboard data and did not record this booking. See the [dated screenshot note](docs/progress/2026-10-09-calendar-demo-screenshots.md) and [integration audit](docs/progress/2026-10-09-integration-audit.md).
 
 ## The problem we chose to solve
 
@@ -133,7 +155,7 @@ This is **not** “we replaced all connectors.” We implemented the domain-spec
 | Roster, attendance, and marks imports | CSV and Excel adapters, validation, templates, corrections, and staged one-time atomic confirmation implemented; isolated Convex transaction flow verified. Authenticated hosted uploads **not** re-tested for this release. |
 | Attendance and marks risk | Deterministic threshold, recovery-class, weak-mark, and falling-mark calculations covered by unit and isolated cross-function tests. |
 | Professor/student dashboards | Implemented with server-side session scoping; anonymous hosted dashboard request returns 401. Authenticated hosted student isolation not re-tested; demo passwords do not establish identity. |
-| Appointment booking | Local Convex conflict and cross-professor checks passed in isolated tests. Google Calendar consent, availability and real event creation are **not verified end to end**. |
+| Appointment booking | Local Convex conflict and cross-professor checks passed in isolated tests. User-provided, redacted screenshots show a confirmed in-app demo booking and matching Google Calendar event for the same slot; hosted OAuth consent, FreeBusy behavior, repeatability and invitation delivery are **not independently verified end to end**. |
 | Voice | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned test number and fixed synthetic context. |
 | Email | Attendance/marks imports create deduplicated warning activity. A manual synthetic warning demo is limited to once per UTC day with a durable claim; public mode simulates. Explicitly enabled live tests go only to the server-pinned consenting inbox with fixed synthetic content. Live inbox receipt has not been verified. |
 | Weekly summary and adviser escalation | Implemented and tested locally; isolated Convex test verifies cohort counts and duplicate weekly claims. The hosted manual route now returns **401 without a session**, not 404; the cron route returns **503** because its required configuration is missing. Neither route has been verified with an authorized run. Scheduling requires `CRON_SECRET` and a monitored VPS cron entry; neither is proved installed. Adviser action requires a configured adviser email and at-risk students. Public mode simulates; optional live test delivery is pinned to a consenting test inbox. |
@@ -145,7 +167,7 @@ This is **not** “we replaced all connectors.” We implemented the domain-spec
 2. Create a subject, import the sample roster, then import attendance and marks.
 3. Open the risk-ranked student list. Pick a student below threshold and inspect the attendance arithmetic, recovery count, and marks trend.
 4. Sign out and sign in with that roster-listed student’s institute email. Confirm that only their records appear.
-5. Book an appointment and show the result. If Google Calendar is not connected, describe it accurately as an in-app reservation—not a Google event.
+5. Book an appointment and show the result. Compare it with the redacted booking/Calendar screenshots above; those images are a separate visual demo, not proof that a new booking in this walkthrough created a Google event. If Google Calendar is not connected, describe the new booking accurately as an in-app reservation.
 6. After checking the VPS configuration with synthetic data, open Automations, run the weekly summary, repeat it to inspect the `already_run` result, and verify aggregate counts. The hosted route exists but **this authenticated path has not been checked**. Public mode marks events simulated; a provider-accepted pinned test does not prove an email was read or a call answered.
 
 **Demo security:** sign-in accepts any non-empty password and does not verify identity. Anyone can impersonate the configured professor or a student account. This is not production authentication or a secure store for real records. Use synthetic student names, emails, phone numbers, attendance, and marks only. Rotate the previously exposed Google OAuth client secret before real use; don't put replacement secrets in issues, chat, or Git. Dependency audit and production authentication hardening remain release work.

@@ -1,0 +1,7 @@
+# 2026-10-09 — booking and Calendar demo screenshots
+
+The user supplied the two newest JPEGs in Downloads. The desktop image shows the Student Success booking interface confirming a consultation on Friday, 9 October, 9:30–10:00 AM. The mobile image shows a matching Google Calendar demo consultation event for Data Structures & Algorithms at 9:30–10:00 AM, with one guest awaiting. They were supplied as evidence after the narrated video was rendered; the video did not capture this booking.
+
+Published derivatives: [`media/calendar-booking-confirmation.jpg`](../../media/calendar-booking-confirmation.jpg) masks the internal booking identifier; [`media/google-calendar-demo-event.jpg`](../../media/google-calendar-demo-event.jpg) is cropped before the guest name/email and Calendar-owner account address. Both were re-encoded without original image metadata. Do not publish the unredacted originals or infer that the guest accepted the invitation.
+
+These matching screenshots support that the demo UI confirmed a booking and a corresponding event appeared in Calendar. They are **user-provided visual evidence**, not an independently logged hosted test of the OAuth consent exchange, FreeBusy conflict checks, event origin, repeatability, or invitation delivery. The earlier [integration audit](2026-10-09-integration-audit.md) and its release gates remain in effect; authorized verification should use consenting synthetic identities only. The public sign-in accepts any non-empty password, so no real student information belongs in the app or repository.
