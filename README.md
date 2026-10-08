@@ -12,7 +12,6 @@
 | **Demo video (Google Drive folder)** | [Open the demo video folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
 | Source | [GitHub repository](https://github.com/YashvanthSankar/babbageBrosAutomation) |
 
-> **Before submitting:** verify the live application opens over HTTPS and the Drive folder contains the final screen recording. Set the video or folder's general access to **Anyone with the link — Viewer**, then test both links in a signed-out/private browser window. At the time of the latest audit, DNS for `automation.zapdos.me` did not resolve from the audit environment, so hosting still needs external verification.
 ## The problem we chose to solve
 
 Attendance sheets and test scores are often reviewed separately, manually, and too late. A percentage may tell a professor that a student is struggling; it does not tell them **how serious the gap is, what changed, or what to do next**. Students may not know they are approaching a requirement until recovering becomes much harder.
@@ -91,7 +90,7 @@ We want the demo to be credible, so we distinguish working application behavior 
 | Voice | Newly-below-threshold trigger and notification deduplication are implemented. One controlled OmniDimension call returned success. That verifies the provider path, **not a complete judge-observed upload-to-call demonstration**. |
 | Email | Risk-based Resend dispatch is implemented. A test send was rejected because the sender domain was not verified/allowed; successful student delivery is not claimed until that is configured. |
 | Weekly summary | Not implemented in this competition version. |
-| Public demo hosting | VPS deployment configuration is included. Add and verify the actual public URL above before submission. |
+| Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Public reachability was not verified from the audit environment. |
 
 ## A judge’s two-minute walkthrough
 
