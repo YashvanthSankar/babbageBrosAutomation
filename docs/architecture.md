@@ -6,7 +6,7 @@
 
 Credentials sign-in remains available. Optional professor-only Google OAuth uses provider `google-professor` and callback `/api/auth/callback/google-professor`; set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and stable token encryption secret. The exact configured professor must consent. Connected slots merge Google FreeBusy and local reservations; unconnected slots explicitly use in-app availability. Connected bookings create Google events.
 
-Import confirmation on the VPS sends grounded risk emails when `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are configured, alerting student, professor and optional `FACULTY_ADVISER_EMAIL`. Newly below-threshold attendance triggers OmniDimension. Snapshot keys prevent repeats and persist dispatch/failed status. No provider dispatch occurs during dashboard reads.
+Import confirmation is the automation trigger; dashboard reads are side-effect free. Public demo mode records simulated email/call events by default. Explicit live-demo mode routes only fixed-content messages/calls to server-pinned consenting test destinations and applies a daily provider cap. Real-recipient delivery is intentionally not enabled for public arbitrary-password demo accounts.
 
 Per the user's explicit 2026-10-08 production instruction, Convex is canonical persistence. Production project is Denoise Labs / bb-automation (project 3173172), deployment groovy-sheep-854. Next.js and automation run on the VPS; provider HTTP calls are performed server-side there.
 
@@ -32,7 +32,7 @@ POST /api/imports/{roster,attendance,marks}/preview stages a batch and returns {
 
 Attendance percentage is attended/total*100; no classes means no data. For target t, required consecutive classes are max(0,ceil((t*total-attended)/(1-t))). Marks flags use comparable percentages. Dashboard sorts high-risk students first.
 
-Provider automation occurs after durable import commit, never during GET. Calls target newly below-threshold students; notification claims prevent duplicate dispatch. Email/voice failures are recorded without undoing a successful import. Integration code documents calendar availability and booking behavior honestly.
+Provider automation occurs after durable import commit, never during GET. Calls are evaluated for newly below-threshold students; notification claims prevent duplicate dispatch. In the public competition demo, email and voice default to an explicitly labeled simulation (`DEMO_LIVE_AUTOMATIONS=false`). To test real delivery, the VPS operator must opt in and configure a consenting `DEMO_AUTOMATION_EMAIL` and Indian E.164 `DEMO_AUTOMATION_PHONE`; live demo sends are pinned to these addresses/numbers, use fixed synthetic content, and never use contact or academic details uploaded by public users. Live sends are capped at one email and one call per provider per UTC day. Failures are recorded without undoing a successful import. Integration status and recent notification events are visible to the professor in the Automation tab. Weekly summaries are not implemented.
 
 ## Verification
 

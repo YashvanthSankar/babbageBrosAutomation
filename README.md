@@ -8,9 +8,11 @@
 
 | Try it | Link |
 |---|---|
-| Live demo | _Add the public VPS URL before submission_ |
-| Demo video | _Add the screen-recording link before submission_ |
+| **Live application** | **`PASTE_PUBLIC_VPS_URL_HERE`** |
+| **Demo video (Google Drive)** | **`PASTE_GOOGLE_DRIVE_VIDEO_LINK_HERE`** |
 | Source | [GitHub repository](https://github.com/YashvanthSankar/babbageBrosAutomation) |
+
+> **Before submitting:** replace both bold placeholders with the deployed HTTPS URL and the shareable Drive video URL. Set the Drive video's general access to **Anyone with the link — Viewer**, then test both links in a signed-out/private browser window.
 
 ## The problem we chose to solve
 
