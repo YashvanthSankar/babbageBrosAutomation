@@ -3,8 +3,7 @@ import type { NextRequest } from 'next/server';
 import type { NextResponse } from 'next/server';
 import { ApiError, handleRoute, json } from '@/lib/api';
 import { getSession, requireAdmin, sessionEmail } from '@/lib/session';
-import { dispatchAtRiskAttendanceCall, VoiceServiceError } from '@/lib/voice/service';
-import { OmniDimensionDispatchError, OmniDimensionNotConfiguredError } from '@/lib/voice/omnidim';
+import { dispatchAtRiskAttendanceCall } from '@/lib/voice/service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,20 +28,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       throw new ApiError(422, 'VALIDATION_ERROR', 'studentId and subjectId must be valid record IDs.');
     }
 
-    try {
-      const result = await dispatchAtRiskAttendanceCall(studentId, subjectId, sessionEmail(session));
-      return json({ call: result }, result.dispatched ? 201 : 200);
-    } catch (error) {
-      if (error instanceof VoiceServiceError) {
-        throw new ApiError(error.status, error.code, error.message);
-      }
-      if (error instanceof OmniDimensionNotConfiguredError) {
-        throw new ApiError(503, 'VOICE_NOT_CONFIGURED', error.message);
-      }
-      if (error instanceof OmniDimensionDispatchError) {
-        throw new ApiError(error.status >= 500 ? 502 : error.status, 'VOICE_DISPATCH_FAILED', error.message);
-      }
-      throw error;
-    }
+    const result = await dispatchAtRiskAttendanceCall(studentId, subjectId, sessionEmail(session));
+    return json({ call: result });
   });
 }

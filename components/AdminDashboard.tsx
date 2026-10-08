@@ -22,11 +22,12 @@ type Tab = "students" | "imports";
 type CallStatus = {
   state: "idle" | "pending" | "success" | "error";
   message?: string;
+  buttonLabel?: string;
 };
 
 type VoiceCallResponse = {
   call?: {
-    status?: "dispatched" | "duplicate" | "not_at_risk";
+    status?: "synthetic_demo" | "not_at_risk";
   };
 };
 
@@ -315,12 +316,13 @@ function StudentRow({ student }: { student: Student }) {
     }
 
     const status = result.data?.call?.status;
-    const message = status === "duplicate"
-      ? "Already called for this attendance record."
-      : status === "not_at_risk"
+    const message = status === "not_at_risk"
         ? "Attendance is no longer below the threshold."
-        : "Call dispatched.";
-    setCalls((current) => ({ ...current, [key]: { state: "success", message } }));
+        : "These are synthetic student details, so no call was placed. Use the example call above with your own number.";
+    setCalls((current) => ({
+      ...current,
+      [key]: { state: "success", message, buttonLabel: status === "synthetic_demo" ? "Demo only" : "Not at risk" },
+    }));
   }
 
   const attendanceRisks = (student.subjects ?? []).filter((subject) => {
@@ -389,7 +391,7 @@ function StudentRow({ student }: { student: Student }) {
                     onClick={() => callStudent(subject)}
                     aria-label={`Call ${student.name ?? "student"} about ${subjectLabel(subject)}`}
                   >
-                    {call.state === "pending" ? "Calling…" : complete ? "Called" : "Call student"}
+                    {call.state === "pending" ? "Checking…" : complete ? call.buttonLabel : "Call student"}
                     <span className="mono call-subject">{subject.code || subject.name}</span>
                   </button>
                   {call.message ? (

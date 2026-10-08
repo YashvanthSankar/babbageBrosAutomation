@@ -110,6 +110,10 @@ The query parameter is optional; the first subject by name is selected by defaul
 
 ## Voice demo
 
+### `POST /api/voice/call`
+
+Professor-only student-risk action. It verifies that the selected roster student is below the attendance threshold, but roster records are synthetic: the endpoint returns `synthetic_demo` and never contacts the voice provider.
+
 ### `POST /api/voice/demo-call`
 
 Professor-only. Accepts `{ "phone": "+919876543210" }` and dispatches the voice agent with a fixed synthetic attendance context of 69%. Numbers must be Indian E.164 mobile numbers. Calls are limited to one per number every 10 minutes and 12 calls per server hour.

@@ -3,8 +3,6 @@ import { ApiError } from '@/lib/api';
 import { convexApi, convexClient, convexSecret, getProfessorTeacherId } from '@/lib/convex';
 import type { AttendanceEntry, ImportPayload, KnownStudent, MarksEntry, RosterRow, ValidationReport } from './types';
 import { dispatchRiskEmails } from '@/lib/email/service';
-import { integrationQuery } from '@/lib/integrations-store';
-import { dispatchAtRiskAttendanceCall } from '@/lib/voice/service';
 export interface ApplyResult { imported: number; updated: number; errors: {row?:number;message:string}[] }
 export interface StagedImport { batchId: string; expiresAt: string; canConfirm: boolean; report: ValidationReport; preview: Record<string, unknown>[] }
 export async function listKnownStudents(email: string): Promise<KnownStudent[]> {
@@ -25,19 +23,11 @@ export async function stageImport(input:StageImportInput):Promise<StagedImport> 
 }
 export interface ConfirmedImport {batchId:string;type:string;processed:number}
 export async function confirmBatch(email:string,batchId:string):Promise<ConfirmedImport> {
- let before: {studentId:string;subjectId:string;attendancePercentage:number|null;threshold:number}[]=[];
- let beforeLoaded=false;
- try {before=await integrationQuery('riskTargets',{professorEmail:email});beforeLoaded=true;}catch{ /* provider storage must not prevent imports */ }
  let result:ConfirmedImport;
  try {result=await convexClient().mutation(convexApi.confirmImport,{secret:convexSecret(),teacherId:await getProfessorTeacherId(email),batchId});}
  catch(error){ const message=error instanceof Error?error.message:'';throw new ApiError(409,'IMPORT_REJECTED',message.includes('BATCH')?'This preview expired, contains errors, or was already confirmed.':'Import validation changed. No records were applied; create a fresh preview.'); }
  if(result.type==='attendance'||result.type==='marks') {
    try {await dispatchRiskEmails(email);}catch{console.error('[email] post-import dispatch failed');}
-   if(result.type==='attendance'&&process.env.OMNIDIM_API_KEY&&beforeLoaded) {
-     try {const after:typeof before=await integrationQuery('riskTargets',{professorEmail:email});const previous=new Set(before.filter(t=>t.attendancePercentage!==null&&t.attendancePercentage<t.threshold).map(t=>`${t.studentId}:${t.subjectId}`));
-       await Promise.all(after.filter(t=>t.attendancePercentage!==null&&t.attendancePercentage<t.threshold&&!previous.has(`${t.studentId}:${t.subjectId}`)).map(async t=>{try{await dispatchAtRiskAttendanceCall(t.studentId,t.subjectId,email);}catch{console.error('[voice] post-import dispatch failed');}}));
-     }catch{console.error('[voice] post-import risk lookup failed');}
-   }
  }
  return result;
 }
