@@ -8,10 +8,11 @@
 
 | Try it | Link |
 |---|---|
-| Live demo | _Add the public VPS URL before submission_ |
-| Demo video | _Add the screen-recording link before submission_ |
+| **Live application** | [https://automation.zapdos.me](https://automation.zapdos.me) |
+| **Demo video (Google Drive folder)** | [Open the demo video folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
 | Source | [GitHub repository](https://github.com/YashvanthSankar/babbageBrosAutomation) |
 
+> **Before submitting:** verify the live application opens over HTTPS and the Drive folder contains the final screen recording. Set the video or folder's general access to **Anyone with the link — Viewer**, then test both links in a signed-out/private browser window. At the time of the latest audit, DNS for `automation.zapdos.me` did not resolve from the audit environment, so hosting still needs external verification.
 ## The problem we chose to solve
 
 Attendance sheets and test scores are often reviewed separately, manually, and too late. A percentage may tell a professor that a student is struggling; it does not tell them **how serious the gap is, what changed, or what to do next**. Students may not know they are approaching a requirement until recovering becomes much harder.
