@@ -1301,3 +1301,79 @@ table.data tbody tr:last-child td {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- automation center ---------- */
+.automation-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.automation-intro h2 { margin-top: 9px; font-size: 1.45rem; letter-spacing: -0.025em; }
+.automation-intro p { margin-top: 4px; color: var(--muted); }
+.automation-mode-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 16px 18px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.automation-mode-banner p { margin-top: 3px; font-size: .86rem; }
+.automation-mode-mark {
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: white;
+  font-size: .69rem;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+.automation-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.automation-provider { padding: 16px; box-shadow: var(--shadow-sm); }
+.automation-provider-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.automation-provider-top span:first-child { color: var(--muted); font-size: .74rem; font-weight: 650; text-transform: uppercase; letter-spacing: .035em; }
+.automation-provider h3 { margin-top: 4px; font-size: .98rem; }
+.automation-provider-state { display: flex; align-items: center; gap: 7px; margin-top: 18px; font-size: .9rem; font-weight: 700; }
+.automation-provider p { margin-top: 5px; color: var(--muted); font-size: .79rem; line-height: 1.45; }
+.automation-indicator { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); flex: none; }
+.automation-indicator.ready { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+.automation-indicator.limited { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.automation-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.automation-step { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.automation-step > span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--surface-3); color: var(--text-soft); font-size: .75rem; font-weight: 750; flex: none; }
+.automation-step.complete > span { background: var(--ok); color: #fff; }
+.automation-step strong, .automation-step small { display: block; }
+.automation-step strong { font-size: .82rem; }
+.automation-step small { margin-top: 3px; color: var(--muted); font-size: .75rem; line-height: 1.4; }
+.automation-feed { padding: 0 20px; }
+.automation-event { display: flex; align-items: center; gap: 12px; min-height: 68px; border-bottom: 1px solid var(--border); }
+.automation-event:last-child { border-bottom: 0; }
+.automation-event-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; flex: none; }
+.automation-event-icon.email { color: var(--accent-strong); background: var(--accent-soft); }
+.automation-event-icon.voice { color: #7a2e0e; background: var(--warn-soft); }
+.automation-event-main { display: flex; flex-direction: column; min-width: 140px; flex: 1; }
+.automation-event-main strong { font-size: .87rem; }
+.automation-event-main > span { color: var(--muted); font-size: .78rem; }
+.automation-event-time { color: var(--muted); font-size: .76rem; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .automation-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .automation-event { align-items: flex-start; flex-wrap: wrap; padding: 12px 0; }
+  .automation-event-main { min-width: calc(100% - 54px); }
+  .automation-event-time { margin-left: 46px; }
+  .automation-steps { grid-template-columns: 1fr; }
+  .automation-feed { padding: 0 14px; }
+}

@@ -14,6 +14,15 @@ export const reserve = mutation({args:{secret:v.string(),professorEmail:v.string
 export const finishBooking = mutation({args:{secret:v.string(),id:v.id('bookings'),status:v.string(),googleEventId:v.optional(v.string())},handler:async(ctx,args)=>{authorize(args.secret);await ctx.db.patch(args.id,{status:args.status,...(args.googleEventId?{googleEventId:args.googleEventId}:{})});}});
 export const claimNotification = mutation({args:{secret:v.string(),professorEmail:v.string(),studentId:v.id('students'),subjectId:v.id('subjects'),key:v.string(),provider:v.string()},handler:async(ctx,args)=>{authorize(args.secret);const existing=await ctx.db.query('notificationEvents').withIndex('by_key',q=>q.eq('key',args.key)).unique();if(existing)return null;const {secret,...record}=args;return ctx.db.insert('notificationEvents',{...record,status:'pending'});}});
 export const finishNotification = mutation({args:{secret:v.string(),id:v.id('notificationEvents'),status:v.string()},handler:async(ctx,args)=>{authorize(args.secret);await ctx.db.patch(args.id,{status:args.status,...(args.status==='dispatched'?{sentAt:Date.now()}:{})});}});
+export const recentNotifications = query({args:{secret:v.string(),professorEmail:v.string()},handler:async(ctx,args)=>{
+  authorize(args.secret);
+  const events=await ctx.db.query('notificationEvents').withIndex('by_professor',q=>q.eq('professorEmail',args.professorEmail)).collect();
+  const recent=events.sort((a,b)=>b._creationTime-a._creationTime).slice(0,40);
+  return Promise.all(recent.map(async event=>{
+    const [student,subject]=await Promise.all([ctx.db.get(event.studentId),ctx.db.get(event.subjectId)]);
+    return {id:event._id,provider:event.provider,status:event.status,createdAt:event._creationTime,sentAt:event.sentAt??null,studentName:student?.name??'Removed student',subjectName:subject?.name??'Removed subject'};
+  }));
+}});
 export const riskTargets = query({args:{secret:v.string(),professorEmail:v.string(),subjectId:v.optional(v.id('subjects'))},handler:async(ctx,args)=>{
  authorize(args.secret);const teacher=await ctx.db.query('teachers').withIndex('by_email',q=>q.eq('email',args.professorEmail)).unique();if(!teacher)return [];
  const subjects=(await ctx.db.query('subjects').withIndex('by_teacher',q=>q.eq('teacherId',teacher._id)).collect()).filter(s=>!args.subjectId||s._id===args.subjectId);

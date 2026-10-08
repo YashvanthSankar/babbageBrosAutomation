@@ -16,8 +16,9 @@ import {
 } from "./helpers";
 import { Alert, Badge, Card, CardHeader, EmptyState, Progress, Stat } from "./ui";
 import UploadsPanel from "./UploadsPanel";
+import AutomationCenter from "./AutomationCenter";
 
-type Tab = "students" | "imports";
+type Tab = "students" | "imports" | "automation";
 
 type CallStatus = {
   state: "idle" | "pending" | "success" | "error";
@@ -136,6 +137,15 @@ export default function AdminDashboard({
               type="button"
             >
               Imports
+            </button>
+            <button
+              className={`tab ${tab === "automation" ? "active" : ""}`}
+              onClick={() => setTab("automation")}
+              role="tab"
+              aria-selected={tab === "automation"}
+              type="button"
+            >
+              Automation
             </button>
           </div>
         </div>
@@ -287,9 +297,17 @@ export default function AdminDashboard({
             </div>
           )}
         </Card>
-      ) : (
+      ) : null}
+      {tab === "imports" ? (
         <UploadsPanel subjects={subjects} studentsCount={students.length} onImported={onChanged} />
-      )}
+      ) : null}
+      {tab === "automation" ? (
+        <AutomationCenter
+          onOpenImports={() => setTab("imports")}
+          hasStudents={students.length > 0}
+          hasSubjects={subjects.length > 0}
+        />
+      ) : null}
     </div>
   );
 }
