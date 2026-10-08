@@ -8,11 +8,11 @@
 
 | Try it | Link |
 |---|---|
-| **Live application** | **`PASTE_PUBLIC_VPS_URL_HERE`** |
-| **Demo video (Google Drive)** | **`PASTE_GOOGLE_DRIVE_VIDEO_LINK_HERE`** |
+| **Live application** | [https://automation.zapdos.me](https://automation.zapdos.me) |
+| **Demo video (Google Drive folder)** | [Open the demo video folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
 | Source | [GitHub repository](https://github.com/YashvanthSankar/babbageBrosAutomation) |
 
-> **Before submitting:** replace both bold placeholders with the deployed HTTPS URL and the shareable Drive video URL. Set the Drive video's general access to **Anyone with the link — Viewer**, then test both links in a signed-out/private browser window.
+> **Before submitting:** verify the live application opens over HTTPS and the Drive folder contains the final screen recording. Set the video or folder's general access to **Anyone with the link — Viewer**, then test both links in a signed-out/private browser window. At the time of the latest audit, DNS for `automation.zapdos.me` did not resolve from the audit environment, so hosting still needs external verification.
 
 ## The problem we chose to solve
 
