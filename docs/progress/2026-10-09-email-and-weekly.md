@@ -1,5 +1,7 @@
 # Email safety, aggregate automation and next steps — 2026-10-09
 
+> Historical implementation note. For later isolated Convex integration tests, hosted 404 findings and the latest release gate, see [the integration audit](2026-10-09-integration-audit.md).
+
 ## Implemented locally (not yet a claim of hosted delivery)
 
 - Fast-forwarded the clean local checkout to `5a3915b` before editing. Its manual demo-email route previously accepted arbitrary typed recipients with process-memory rate limits; that is unsafe with impersonable demo credentials. It now simulates by default, rejects an arbitrary recipient field and requires a server-pinned consenting test inbox for optional live sends. Its limit is a Convex-backed one-attempt-per-professor-per-UTC-day claim. The dashboard no longer requests an email address and distinguishes simulation from provider acceptance.

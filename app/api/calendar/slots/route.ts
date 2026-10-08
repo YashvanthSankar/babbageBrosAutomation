@@ -46,7 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const date = (request.nextUrl.searchParams.get('date') ?? '').trim();
 
     if (!subjectId) {
-      throw new ApiError(400, 'INVALID_SUBJECT', 'subjectId must be a positive integer.');
+      throw new ApiError(400, 'INVALID_SUBJECT', 'Choose a valid subject.');
     }
     if (!isValidIsoDate(date)) {
       throw new ApiError(400, 'INVALID_DATE', 'date must be a valid YYYY-MM-DD value.');

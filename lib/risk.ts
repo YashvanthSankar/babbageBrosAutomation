@@ -3,19 +3,19 @@
  *
  * This module merges two contracts:
  *
- * 1. The dashboard contract (docs/architecture.md, used by lib/dashboard.ts and
- *    the professor/student UI). Thresholds are fixed at 85/90:
+ * 1. Legacy standalone helpers use default 85/90 thresholds. The dashboard
+ *    (lib/dashboard.ts) uses the configurable threshold on each subject:
  *      attendancePercent = attended / total * 100   (0 classes => no data, not 0%)
- *      classesToRecover  = max(0, ceil((0.85 * total - attended) / 0.15))
- *      atRisk            = attendancePercent !== null && attendancePercent < 85
- *      warn              = 85 <= attendancePercent < 90
+ *      classesToRecover  = max(0, ceil((target * total - attended) / (1 - target)))
+ *                          where target is the subject threshold as a fraction
+ *      atRisk            = attendancePercent !== null && attendancePercent < target
+ *      warn              = target <= attendancePercent < target + 5
  *
  * 2. The ingestion contract (ported from the `upload` branch) with a
  *    per-subject configurable threshold and the AT_RISK/WATCH/SAFE/NO_DATA
  *    status vocabulary used by the imported-API docs.
  *
- * Both live here so the dashboard keeps its existing shape while the imported
- * risk helpers (and their unit tests) remain available.
+ * The helpers below also support the imported-API contract and its tests.
  */
 
 export const ATTENDANCE_RISK_THRESHOLD = 85;

@@ -43,7 +43,7 @@ Professor-only student roster management. The roster should be imported before a
 
 ## Imports
 
-Uploads are `multipart/form-data` with a `file` field. Roster is imported first. Attendance and marks uploads also need the relevant `subjectId`.
+Uploads are `multipart/form-data` with a `file` field. Roster is imported first. Attendance needs the relevant `subjectId`; Excel marks need `subjectId` and assessment metadata, while CSV marks may identify subjects per row or use a selected `subjectId`.
 
 ### Staged preview and confirmation
 
@@ -56,7 +56,7 @@ Preview responses include `{ data: { batchId, expiresAt, canConfirm, report, pre
 
 ### Direct dashboard imports
 
-`POST /api/ingest/roster`, `/api/ingest/attendance`, and `/api/ingest/marks` are professor-only multipart endpoints for the dashboard's direct import flow. Attendance requires `subjectId`; marks requires assessment metadata and `subjectId`. These routes apply validated records directly instead of returning a separate preview batch.
+`POST /api/ingest/roster`, `/api/ingest/attendance`, and `/api/ingest/marks` are professor-only multipart endpoints for the dashboard's direct import flow. Attendance requires `subjectId`; Excel marks require `subjectId`, `assessmentName`, `assessmentDate`, and `maxMarks`. CSV marks take test data in their rows and can use `subjectId` to select a subject. These routes stage and confirm validated records immediately instead of returning a separate preview batch.
 
 ### Templates
 

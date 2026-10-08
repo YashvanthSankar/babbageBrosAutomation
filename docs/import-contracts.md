@@ -1,6 +1,6 @@
 # Workbook import contracts
 
-Only `.xlsx` files are accepted. The maximum size defaults to 2 MiB and can be changed with `MAX_UPLOAD_BYTES`. Only the first worksheet is processed. A workbook can have at most 2,000 data rows; attendance workbooks can have at most 370 date columns.
+This page describes the `.xlsx` workbook parser. The dashboard also accepts CSV for roster, attendance and marks; see [the API reference](api-reference.md) and [CSV examples](../README.md#sample-imports). The upload size maximum defaults to 2 MiB and can be changed with `MAX_UPLOAD_BYTES`. Only the first worksheet of an Excel file is processed. A workbook can have at most 2,000 data rows; attendance workbooks can have at most 370 date columns.
 
 ## Roster workbook
 

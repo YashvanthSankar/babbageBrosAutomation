@@ -4,11 +4,12 @@
  * Flow (all server-side):
  *   1. derive the student from the session email mapped to the roster
  *   2. validate subject ownership and booking window
- *   3. reserve the local appointment slot transactionally (advisory lock +
- *      overlap check)
+ *   3. reserve the local appointment slot in a Convex mutation with an
+ *      overlap check
  *
- * The DB transaction makes double booking impossible even under concurrent
- * requests.
+ * The mutation serializes conflicting reservations on the professor's
+ * booking set. Google availability is checked before this local reservation;
+ * a remote event created concurrently may still race that check.
  */
 import type { NextRequest } from 'next/server';
 import type { NextResponse } from 'next/server';
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const subjectId = String(payload.subjectId??'');
     if (!subjectId) {
-      throw new ApiError(400, 'INVALID_SUBJECT', 'subjectId must be a positive integer.');
+      throw new ApiError(400, 'INVALID_SUBJECT', 'Choose a valid subject.');
     }
 
     const start = parseInstant(payload.start);
@@ -95,8 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const startIso = start.toISOString();
     const endIso = end.toISOString();
 
-    // Transactional reservation: serialize bookings per professor and re-check
-    // local overlap inside the lock.
+    // Re-check local overlap in the Convex reservation mutation.
     const calendarConnected=await hasProfessorRefreshToken(subject.professor_email);
     if(calendarConnected && (await googleBusy(subject.professor_email,startIso,endIso)).length) throw new ApiError(409,'SLOT_UNAVAILABLE','This time is occupied in the professor calendar.');
     let bookingId:string;

@@ -199,11 +199,11 @@ export default function AutomationCenter({
           title="Weekly summary"
           provider="Scheduled digest"
           loading={loading}
-           ready={Boolean(status?.weeklySummary.cronConfigured)}
-           value={status?.weeklySummary.cronConfigured ? "Cron ready" : "Manual run available"}
-           detail="Aggregate counts only. Weekly runs are recorded once per ISO week; public mode simulates email. Scheduling requires VPS cron and CRON_SECRET."
-         />
-       </div>
+          ready={Boolean(status?.weeklySummary.cronConfigured)}
+          value={status?.weeklySummary.cronConfigured ? "Cron secret configured" : "Manual run available"}
+          detail="Aggregate counts only. Weekly runs are recorded once per ISO week; public mode simulates email. Scheduling requires a separate VPS cron job; a configured secret does not prove that job exists."
+        />
+      </div>
 
        <Card padded={false}><CardHeader title="Weekly support summary" subtitle="Run an idempotent cohort digest; adviser escalation is recorded when a configured adviser and at-risk students exist." />
          <div className="card-body stack"><button className="btn" type="button" disabled={runningWeekly} onClick={() => void runWeekly()}>{runningWeekly ? "Running…" : "Run this week's summary"}</button>
