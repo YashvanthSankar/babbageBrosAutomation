@@ -19,6 +19,13 @@ const navigation = [
 ];
 const riskRank: Record<string, number> = { high: 0, warn: 1, ok: 2, unknown: 3 };
 
+type DemoEmailResponse = {
+  email?: {
+    dispatched?: boolean;
+    attendancePercentage?: number;
+  };
+};
+
 function levelFor(subjects: SubjectStat[]): string {
   return subjects.reduce((worst, subject) => (riskRank[subject.riskLevel ?? "unknown"] < riskRank[worst] ? subject.riskLevel ?? "unknown" : worst), "unknown");
 }
@@ -110,9 +117,47 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
         </Card>
       </> : null}
       {tab === "imports" ? <><Card padded={false}><CardHeader title="Set up your subjects" subtitle="Each subject starts with an 85% attendance and 50% marks threshold." /><div className="card-body stack">{subjects.length ? <div className="chips">{subjects.map(subject => <Badge key={String(subject.id)} tone="accent">{subjectLabel(subject)}</Badge>)}</div> : null}<form onSubmit={addSubject} className="subject-form"><label className="field"><span className="field-label">Subject name</span><input required className="input" value={subjectName} onChange={event => setSubjectName(event.target.value)} placeholder="Data structures" maxLength={120} /></label><label className="field"><span className="field-label">Subject code</span><input className="input" value={subjectCode} onChange={event => setSubjectCode(event.target.value)} placeholder="CS201" maxLength={30} /></label><label className="field"><span className="field-label">Department</span><input className="input" value={department} onChange={event => setDepartment(event.target.value)} placeholder="Computer Science" maxLength={120} /></label><button className="btn btn-primary" disabled={savingSubject || !subjectName.trim()}>{savingSubject ? "Adding…" : "Add subject"}</button></form>{subjectError ? <Alert tone="error" title="Subject could not be added">{subjectError}</Alert> : null}</div></Card><UploadsPanel subjects={subjects} studentsCount={students.length} onImported={onChanged} /></> : null}
-      {tab === "automation" ? <AutomationCenter onOpenImports={() => setTab("imports")} hasStudents={students.length > 0} hasSubjects={subjects.length > 0} /> : null}
+      {tab === "automation" ? <><DemoEmailCard /><AutomationCenter onOpenImports={() => setTab("imports")} hasStudents={students.length > 0} hasSubjects={subjects.length > 0} /></> : null}
     </div>
   </div>;
+}
+
+function DemoEmailCard() {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function dispatchDemoEmail(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const recipient = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+      setState("error");
+      setMessage("Enter a valid email address.");
+      return;
+    }
+    setState("pending");
+    setMessage(null);
+    const result = await apiPostJson<DemoEmailResponse>("/api/email/demo-send", { email: recipient });
+    if (result.ok) {
+      setState("success");
+      setMessage(`Demo email dispatched to ${recipient} with 69% attendance context.`);
+    } else {
+      setState("error");
+      setMessage(result.error ?? "Could not send the demo email.");
+    }
+  }
+
+  return <Card padded={false} className="demo-email-card">
+    <CardHeader title="Email yourself a demo warning" subtitle="Send the synthetic attendance-risk message a student at 69% attendance would receive." actions={<Badge tone="accent">69% attendance</Badge>} />
+    <div className="card-body">
+      <form className="demo-email-form" onSubmit={dispatchDemoEmail}>
+        <label className="field demo-email-field"><span className="field-label">Your email address</span><input className="input" type="email" inputMode="email" autoComplete="email" placeholder="you@institute.edu" value={email} onChange={event => { setEmail(event.target.value); if (state !== "idle") { setState("idle"); setMessage(null); } }} disabled={state === "pending"} required /></label>
+        <button className="btn btn-primary demo-email-button" type="submit" disabled={state === "pending"}>{state === "pending" ? "Sending…" : "Email me the demo warning"}</button>
+      </form>
+      <p className="field-hint demo-email-note">Only fixed synthetic 69% attendance context is sent to the address entered here. No roster lookup or student contact data is used.</p>
+      {message ? <div className={`demo-email-result ${state === "error" ? "error" : "success"}`} role={state === "error" ? "alert" : "status"}>{message}</div> : null}
+    </div>
+  </Card>;
 }
 
 function Metric({ label, value, hint, icon, tone = "accent" }: { label: string; value: React.ReactNode; hint: string; icon: "users" | "alert" | "book" | "chart"; tone?: "accent" | "danger" }) {

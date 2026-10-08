@@ -100,6 +100,10 @@ Professor-only recent notification events, including whether an event was simula
 
 Professor-only JSON `{ "studentId": "...", "subjectId": "..." }`. The service checks risk; public mode records a simulation. Explicit live tests can dispatch only to a server-pinned consenting test number using fixed synthetic context. This route does not accept a phone number. There is no arbitrary-number demo-call endpoint.
 
+### `POST /api/email/demo-send`
+
+Professor-only JSON `{ "email": "you@example.com" }`. Sends one clearly labeled synthetic warning with fixed 69% attendance context only to the entered address. It performs no roster lookup. Sends are limited to one per address every 10 minutes and 30 per server hour.
+
 ## Common error codes
 
 | Code | Meaning |

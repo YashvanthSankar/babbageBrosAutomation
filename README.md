@@ -88,7 +88,7 @@ We want the demo to be credible, so we distinguish working application behavior 
 | Professor/student dashboards | Implemented with server-side role and student-record scoping. |
 | Appointment booking | In-app reservations and collision rejection were tested. Google Calendar synchronization is optional and requires a configured dedicated demo Google account, web OAuth credentials, and that account's consent; do not assume it is connected in a demo. |
 | Voice | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned test number and fixed synthetic context. |
-| Email | Attendance/marks imports create deduplicated warning activity. Public mode simulates; explicitly enabled live tests go only to the server-pinned test inbox with generic synthetic content. Live inbox receipt is not yet verified. |
+| Email | Attendance/marks imports create deduplicated warning activity. Public mode simulates; explicitly enabled live tests go only to the server-pinned test inbox. A separate professor-only control can send a fixed synthetic 69% warning to an address entered explicitly for the demo. |
 | Weekly summary | Not implemented in this competition version. |
 | Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Hosted on the VPS. |
 
