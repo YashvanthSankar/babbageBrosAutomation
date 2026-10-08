@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { signIn, useSession } from 'next-auth/react';
+import { apiGet, apiPostJson } from "./api";
 import type { AdminDashboard as AdminData, Student, SubjectStat } from "./types";
 import {
   attendancePercent,
@@ -24,12 +26,37 @@ export default function AdminDashboard({
   data: AdminData;
   onChanged: () => void;
 }) {
+  const {data:session}=useSession();
   const [tab, setTab] = useState<Tab>("students");
   const [query, setQuery] = useState("");
+  const [ownedSubjects, setOwnedSubjects] = useState<SubjectStat[]>([]);
+  const [subjectName, setSubjectName] = useState("");
+  const [subjectCode, setSubjectCode] = useState("");
+  const [department, setDepartment] = useState("");
+  const [subjectError, setSubjectError] = useState<string | null>(null);
+  const [savingSubject, setSavingSubject] = useState(false);
+  useEffect(() => {
+    apiGet<{ subjects: SubjectStat[] }>("/api/subjects").then((result) => {
+      if (result.ok) setOwnedSubjects(result.data?.subjects ?? []);
+    });
+  }, [data]);
+  async function addSubject(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingSubject(true);
+    setSubjectError(null);
+    const result = await apiPostJson<SubjectStat>("/api/subjects", {
+      name: subjectName.trim(), code: subjectCode.trim(), department: department.trim(), threshold: 85, attendanceThreshold: 85, marksThreshold: 50,
+    });
+    setSavingSubject(false);
+    if (!result.ok || !result.data) { setSubjectError(result.error ?? "Could not add subject."); return; }
+    setOwnedSubjects((previous) => [...previous, result.data!]);
+    setSubjectName(""); setSubjectCode(""); setDepartment("");
+    onChanged();
+  }
 
   const students = data.students ?? [];
   const summary = useMemo(() => summarize(students), [students]);
-  const subjects = useMemo(() => uniqueSubjects(students), [students]);
+  const subjects = useMemo(() => ownedSubjects.length ? ownedSubjects : uniqueSubjects(students), [students, ownedSubjects]);
 
   // Prefer server-provided stats when present; fall back to values computed
   // from the live roster (never fabricated).
@@ -120,16 +147,30 @@ export default function AdminDashboard({
         <CardHeader
           title="Appointment scheduling"
           subtitle="Students can request subject-specific advising appointments from available slots."
-          actions={<Badge tone="accent">Availability managed in app</Badge>}
+          actions={<Badge tone="accent">{session?.user.hasCalendar?'Google Calendar connected':'In-app appointments'}</Badge>}
         />
         <div className="card-body stack" style={{ gap: 12 }}>
           <Alert tone="info" title="Student appointments">
             Students select a subject, date, and open appointment slot. The service checks slot
             availability again when the booking is confirmed, preventing duplicate reservations.
           </Alert>
+          <div className="row-between"><p className="small muted">Connect your Google Calendar to check teaching commitments and add consultation events.</p><button className="btn btn-sm" type="button" onClick={()=>signIn('google-professor')}>Connect Google Calendar</button></div>
         </div>
       </Card>
 
+      {tab === "imports" ? <Card padded={false}>
+        <CardHeader title="Subjects" subtitle="Add a subject before importing its attendance and test results." />
+        <div className="card-body stack">
+          {subjects.length > 0 ? <div className="chips">{subjects.map((subject) => <Badge key={String(subject.id)} tone="accent">{subjectLabel(subject)}</Badge>)}</div> : null}
+          <form onSubmit={addSubject} className="subject-form">
+            <label className="field"><span className="field-label">Subject name</span><input required className="input" value={subjectName} onChange={(event) => setSubjectName(event.target.value)} placeholder="Data structures" maxLength={120} /></label>
+            <label className="field"><span className="field-label">Subject code</span><input className="input" value={subjectCode} onChange={(event) => setSubjectCode(event.target.value)} placeholder="CS201" maxLength={30} /></label>
+            <label className="field"><span className="field-label">Department</span><input className="input" value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="Computer Science" maxLength={120} /></label>
+            <button className="btn btn-primary" disabled={savingSubject || !subjectName.trim()}>{savingSubject ? "Adding…" : "Add subject"}</button>
+          </form>
+          {subjectError ? <Alert tone="error" title="Subject could not be added">{subjectError}</Alert> : null}
+        </div>
+      </Card> : null}
       {tab === "students" ? (
         <Card padded={false}>
           <CardHeader
@@ -151,11 +192,11 @@ export default function AdminDashboard({
             }
           />
           {students.length === 0 ? (
-            <EmptyState icon="👥" title="No students in the roster">
+            <EmptyState title="No students in the roster">
               Upload the roster CSV to populate this table.
             </EmptyState>
           ) : filtered.length === 0 ? (
-            <EmptyState icon="🔍" title="No matches">
+            <EmptyState title="No matches">
               No student matches “{query}”.
             </EmptyState>
           ) : (

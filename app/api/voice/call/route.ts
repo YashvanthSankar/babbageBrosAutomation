@@ -9,9 +9,8 @@ import { OmniDimensionDispatchError, OmniDimensionNotConfiguredError } from '@/l
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function positiveInteger(value: unknown): number | null {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+function positiveInteger(value: unknown): string | null {
+  return typeof value==='string'&&value.trim()?value.trim():null;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -27,7 +26,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const studentId = positiveInteger(payload.studentId);
     const subjectId = positiveInteger(payload.subjectId);
     if (!studentId || !subjectId) {
-      throw new ApiError(422, 'VALIDATION_ERROR', 'studentId and subjectId must be positive integers.');
+      throw new ApiError(422, 'VALIDATION_ERROR', 'studentId and subjectId must be valid record IDs.');
     }
 
     try {

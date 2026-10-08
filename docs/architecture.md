@@ -1,37 +1,39 @@
 # Education automation: shared implementation contract
 
-## Actors and safety
+## Persistence and ownership
 
-- One professor/admin initially, configured by `PROFESSOR_EMAIL` (exact address). Never infer admin from the email domain. The demo sign-in requires a name, Indian E.164 phone, `@iiitdm.ac.in` email, and any non-empty password; all non-admin institute emails are students.
-- Never trust a student ID or email from a client request for authorization: look up the authenticated session email and map it to the roster. No student may see another student's marks/attendance or raw phone number. Admin-only uploads, roster, risk table and notifications.
+## Provider connection contract
 
-## Canonical data
+Credentials sign-in remains available. Optional professor-only Google OAuth uses provider `google-professor` and callback `/api/auth/callback/google-professor`; set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and stable token encryption secret. The exact configured professor must consent. Connected slots merge Google FreeBusy and local reservations; unconnected slots explicitly use in-app availability. Connected bookings create Google events.
 
-- `students`: `id`, `name`, `roll_no` (unique), `email` (unique, normalized lowercase), `phone` (admin-only), `active` (default true); professor membership via `professor_email`.
-- `subjects`: `id`, `name`, `code`, `professor_email`, `department`, `threshold` (1–99, default 85).
-- `attendance_records`: `student_id`, `subject_id`, `class_date` (ISO date), `present` (boolean). Unique by `(student_id, subject_id, class_date)`; update rather than double-count on re-import.
-- `test_results`: `student_id`, `subject_id`, `test_name`, `test_date`, `score`, `max_score`. Calculate percentages for comparable results.
-- `import_batches`: staged, single-use `.xlsx`/`.csv` previews from the ported ingestion API. Stores `professor_email`, optional `subject_id`, `type` (`roster|attendance|marks`), `filename`, `checksum`, `status` (`pending|processing|confirmed|expired`), `parsed_payload` (JSONB), `validation_report` (JSONB), `expires_at` (30 minutes) and `confirmed_at`. The original binary is never stored.
-- `bookings`: `id`, `student_id`, `subject_id`, `professor_email`, `starts_at`, `ends_at`, `status`. Prevent overlapping reservations locally with a transactional lock.
-- `notification_events`: idempotency key per student/subject/risk transition, provider, status, timestamp (voice teammate).
+Import confirmation on the VPS sends grounded risk emails when `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are configured, alerting student, professor and optional `FACULTY_ADVISER_EMAIL`. Newly below-threshold attendance triggers OmniDimension. Snapshot keys prevent repeats and persist dispatch/failed status. No provider dispatch occurs during dashboard reads.
 
-**Upload order:** professor imports roster FIRST, then attendance or marks. Reject unknown roll numbers and return a row-specific error. Roster mandatory columns `studentname,rollno,phone,email`. Attendance accepts `rollno,date1,date2,...` where each date header is an actual parseable class date (`YYYY-MM-DD` preferred), and values such as `P/A`, `present/absent`, `1/0`; skip blank cells. Subject is required separately for each upload. Marks need `rollno,subject,test_name,test_date,score,max_score` (or a subject selected in UI). Ingestion teammate should publish exact accepted formats and errors in this document.
+Per the user's explicit 2026-10-08 production instruction, Convex is canonical persistence. Production project is Denoise Labs / bb-automation (project 3173172), deployment groovy-sheep-854. Next.js and automation run on the VPS; provider HTTP calls are performed server-side there.
 
-Risk is computed, not AI-generated: `attendancePercent = attended / total * 100`; `classesToRecover = max(0, ceil((0.85 * total - attended) / 0.15))` with 0 total classes treated as no attendance data, not 0%. Flag below 85, optionally warn at 85–90; show latest marks and a falling trend compared with the previous comparable result.
+Schema source: convex/schema.ts. Core atomic imports/CRUD: convex/backend.ts. Dashboard data: convex/dashboard.ts. Booking, token and notification persistence: convex/integrations.ts. Server adapters use lib/convex.ts with a server-only CONVEX_BACKEND_SECRET. db/schema.sql and archived Drizzle/JOSE implementations are historical references.
 
-## HTTP interfaces (JSON)
+All public Convex functions validate the shared secret; owner IDs are resolved from the NextAuth session on the Next server. Professor is the exact configured PROFESSOR_EMAIL. Student records are selected by session email. Never accept a teacher owner from client input. Student dashboards omit other students and raw phone contacts.
 
-- `GET /api/dashboard`: session-scoped result. Admin gets `{role:"admin",professor,stats,students:[{id,name,rollNo,email,department,subjects:[{id,code,name,attended,total,attendancePercent,classesToRecover,latestScore,previousScore,atRisk}],riskLevel}]}`. Student gets `{role:"student",student:<same student object>,professor}`. No phone in student response.
-- `GET /api/calendar/slots?subjectId=...&date=YYYY-MM-DD`: student and professor allowed; return `{slots:[{start,end,available}]}` in ISO UTC from local appointment reservations.
-- `POST /api/calendar/book`: `{subjectId,start,end}`; derive student from session; server validates subject membership, dates, availability, and creates booking/event. Returns `{booking:{id,start,end,status}}` or a clear actionable error.
-- `POST /api/ingest/roster`, `/api/ingest/attendance`, `/api/ingest/marks`: admin only; multipart `file` (`.csv` or `.xlsx`) plus `subjectId` for attendance and optional marks; report `{imported,updated,errors:[{row,message}]}`. Implemented in `app/api/ingest/*`.
-- `POST /api/imports/roster/preview`, `/api/imports/attendance/preview`, `/api/imports/{batchId}/confirm`: the ported preview/confirm ingestion API (admin only, `.xlsx` or `.csv`). Preview stages an `import_batches` row and returns `{data:{batchId,expiresAt,canConfirm,report,preview}}`; confirm atomically applies it once. Canonical docs are archived at `docs/upload-branch/docs/import-contracts.md`.
-- `/api/voice/*`: voice teammate owns trigger/deduplication and logging; below-threshold transitions only, never on dashboard GET.
+## Tables and IDs
 
-## Appointment slots
+Convex string document IDs are preserved end-to-end; do not coerce IDs to numbers. Core tables: teachers, students, subjects, importBatches, attendanceRecords, assessments, marksRecords. Teachers are indexed by normalized email; students by teacher and normalized roll. Subjects carry attendanceThreshold and marksThreshold. Imports do not persist original files. Additional booking/token/notification tables are declared in the shared schema.
 
-Appointment availability is local to this application. A transactional reservation prevents double-booking; it is not Google Calendar synchronization.
+Roster confirmation resolves both roll and normalized email under the same teacher, so a student who signs in before upload is attached to the imported roll without creating a duplicate identity. Conflicting identities reject the transaction. Imports never transfer ownership between teachers.
 
-## Integration / deployment
+## Import contracts
 
-Next.js TypeScript App Router with PostgreSQL on VPS. Keep imports and provider calls on server routes; frontend fetches session-scoped endpoints. Set `DATABASE_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `PROFESSOR_EMAIL`, and provider-specific secrets only if integration enabled. Start the DB schema before imports; do not delete or replace teammates' uncommitted files. Demo video must show actual hosted flow and identify any unavailable provider capability honestly.
+Roster first. XLSX: roll_number,name,email,phone. Dashboard CSV aliases include studentname,rollno,phone,email. Attendance: roll_number followed by actual class-date columns; XLSX statuses P/A, CSV also present/absent and 1/0. Blank cells are skipped. Unknown students are validation errors.
+
+Marks XLSX: roll_number,marks_obtained with multipart subjectId,assessmentName,assessmentDate,maxMarks. CSV: rollno,subject,test_name,test_date,score,max_score; selecting subjectId replaces per-row subject matching. All scores must be finite and between zero and the positive maximum. Re-imports update scores; changing an assessment maximum re-normalizes its scores atomically and rejects an impossible maximum.
+
+POST /api/imports/{roster,attendance,marks}/preview stages a batch and returns {data:{batchId,expiresAt,canConfirm,report,preview}}. POST /api/imports/{batchId}/confirm validates ownership, expiry and errors then applies all data in one Convex transaction. A failed validation rolls back all changes. Dashboard POST /api/ingest/{roster,attendance,marks} uses the same service. Templates are GET /api/templates/{roster,attendance,marks}. GET /api/students and /api/subjects return dashboard-friendly IDs.
+
+## Risk and downstream automation
+
+Attendance percentage is attended/total*100; no classes means no data. For target t, required consecutive classes are max(0,ceil((t*total-attended)/(1-t))). Marks flags use comparable percentages. Dashboard sorts high-risk students first.
+
+Provider automation occurs after durable import commit, never during GET. Calls target newly below-threshold students; notification claims prevent duplicate dispatch. Email/voice failures are recorded without undoing a successful import. Integration code documents calendar availability and booking behavior honestly.
+
+## Verification
+
+npm run test, npm run typecheck, npm run build. Use synthetic data for the demo and validate deployed sign-in, roster/attendance/marks upload, risk, booking and notification status. Never commit .env.local or service credentials.

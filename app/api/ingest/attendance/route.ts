@@ -18,7 +18,6 @@ import {
 import { parseAttendanceCsv } from '@/lib/imports/csv';
 import { parseAttendanceWorkbook } from '@/lib/imports/parser';
 import { applyAttendance, listKnownStudents, requireSubject } from '@/lib/imports/service';
-import { dispatchAtRiskAttendanceCall, findAtRiskStudentIds } from '@/lib/voice/service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,30 +47,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? await parseAttendanceWorkbook(file.buffer, subjectId, knownStudents)
         : parseAttendanceCsv(file.buffer.toString('utf8'), subjectId, knownStudents);
 
-    const atRiskBeforeImport = await findAtRiskStudentIds(professorEmail, subjectId);
+    if (result.report.errors.length) return json({ imported: 0, updated: 0, errors: toRowErrors(result.report.errors) });
     const applied = await applyAttendance(professorEmail, subjectId, result.payload.entries);
-
-    const studentIdByRoll = new Map(
-      knownStudents.map((student) => [student.rollNumber.trim().toLowerCase(), student.id]),
-    );
-    const touchedStudentIds = new Set(
-      result.payload.entries
-        .map((entry) => studentIdByRoll.get(entry.rollNumber.trim().toLowerCase()))
-        .filter((id): id is number => id !== undefined),
-    );
-    // A successful import must not be undone if a provider is unavailable.
-    // Calls occur only when a student newly crosses below the threshold.
-    await Promise.all(
-      [...touchedStudentIds]
-        .filter((studentId) => !atRiskBeforeImport.has(studentId))
-        .map(async (studentId) => {
-          try {
-            await dispatchAtRiskAttendanceCall(studentId, subjectId, professorEmail);
-          } catch (error) {
-            console.error('[voice] automatic call dispatch failed', error);
-          }
-        }),
-    );
     return json({
       imported: applied.imported,
       updated: applied.updated,

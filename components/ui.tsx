@@ -93,7 +93,7 @@ export function Alert({
 }
 
 export function EmptyState({
-  icon = "🗂",
+  icon,
   title,
   children,
 }: {
@@ -104,7 +104,7 @@ export function EmptyState({
   return (
     <div className="empty">
       <div className="empty-icon" aria-hidden>
-        {icon}
+        {icon ?? <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 6h16v14H4zM8 3h8v6H8zM8 13h8M8 16h5" /></svg>}
       </div>
       <div className="empty-title">{title}</div>
       {children ? <div className="small">{children}</div> : null}

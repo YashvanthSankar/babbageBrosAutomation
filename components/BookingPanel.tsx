@@ -115,7 +115,7 @@ export default function BookingPanel({
       />
       <div className="card-body stack" style={{ gap: 16 }}>
         {subjects.length === 0 ? (
-          <EmptyState icon="📅" title="Booking unavailable">
+          <EmptyState title="Booking unavailable">
             No subjects are available on your record yet, so there is nothing to book against.
           </EmptyState>
         ) : (
@@ -212,7 +212,7 @@ export default function BookingPanel({
 
             {slots && !loading ? (
               slots.length === 0 ? (
-                <EmptyState icon="🗓" title="No slots for this date">
+                <EmptyState title="No slots for this date">
                   The professor has no free time on {formatDay(date)}. Try another day.
                 </EmptyState>
               ) : (

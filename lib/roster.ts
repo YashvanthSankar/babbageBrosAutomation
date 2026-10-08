@@ -1,77 +1,40 @@
-/**
- * Roster / subject lookups. All reads are parameterized.
- */
-import { query } from './db';
-import { normalizeEmail } from './env';
+/** Session-scoped Convex roster access. */
+import { getProfessorEmail } from './env';
+import { workspaceSnapshot, type ConvexStudent, type ConvexSubject } from './convex-snapshot';
 
 export interface StudentRow {
-  id: number;
-  name: string;
-  roll_no: string;
-  email: string;
-  phone: string | null;
-  professor_email: string;
+  id: string; name: string; roll_no: string; email: string; phone: string | null; professor_email: string;
 }
-
 export interface SubjectRow {
-  id: number;
-  name: string;
-  code: string;
-  professor_email: string;
-  department: string | null;
+  id: string; name: string; code: string; professor_email: string; department: string | null; threshold: number; marksThreshold: number;
 }
-
+export function studentRow(row: ConvexStudent, professorEmail: string): StudentRow {
+  return { id: row._id, name: row.name, roll_no: row.rollNumber, email: row.email, phone: row.phone || null, professor_email: professorEmail };
+}
+export function subjectRow(row: ConvexSubject, professorEmail: string): SubjectRow {
+  return { id: row._id, name: row.name, code: row.code ?? row.name, professor_email: professorEmail, department: row.department ?? null, threshold: row.attendanceThreshold, marksThreshold: row.marksThreshold };
+}
 export async function findStudentByEmail(email: string): Promise<StudentRow | null> {
-  const result = await query<StudentRow>(
-    `SELECT id, name, roll_no, email, phone, professor_email
-       FROM students
-      WHERE email = $1
-      LIMIT 1`,
-    [normalizeEmail(email)],
-  );
-  return result.rows[0] ?? null;
+  const professor = getProfessorEmail();
+  const snapshot = await workspaceSnapshot(professor);
+  const student = snapshot.students.find(row => row.active && row.email.trim().toLowerCase() === email.trim().toLowerCase());
+  return student ? studentRow(student, professor) : null;
 }
-
-export async function findStudentById(id: number): Promise<StudentRow | null> {
-  const result = await query<StudentRow>(
-    `SELECT id, name, roll_no, email, phone, professor_email
-       FROM students
-      WHERE id = $1
-      LIMIT 1`,
-    [id],
-  );
-  return result.rows[0] ?? null;
+export async function findStudentById(id: string | number): Promise<StudentRow | null> {
+  const professor = getProfessorEmail();
+  const snapshot = await workspaceSnapshot(professor);
+  const student = snapshot.students.find(row => row.active && row._id === String(id));
+  return student ? studentRow(student, professor) : null;
 }
-
-export async function findSubjectById(id: number): Promise<SubjectRow | null> {
-  const result = await query<SubjectRow>(
-    `SELECT id, name, code, professor_email, department
-       FROM subjects
-      WHERE id = $1
-      LIMIT 1`,
-    [id],
-  );
-  return result.rows[0] ?? null;
+export async function findSubjectById(id: string | number): Promise<SubjectRow | null> {
+  const professor = getProfessorEmail();
+  const snapshot = await workspaceSnapshot(professor);
+  const subject = snapshot.subjects.find(row => row._id === String(id));
+  return subject ? subjectRow(subject, professor) : null;
 }
-
 export async function listSubjectsForProfessor(professorEmail: string): Promise<SubjectRow[]> {
-  const result = await query<SubjectRow>(
-    `SELECT id, name, code, professor_email, department
-       FROM subjects
-      WHERE professor_email = $1
-      ORDER BY code ASC`,
-    [normalizeEmail(professorEmail)],
-  );
-  return result.rows;
+  return (await workspaceSnapshot(professorEmail)).subjects.map(row => subjectRow(row, professorEmail));
 }
-
 export async function listStudentsForProfessor(professorEmail: string): Promise<StudentRow[]> {
-  const result = await query<StudentRow>(
-    `SELECT id, name, roll_no, email, phone, professor_email
-       FROM students
-      WHERE professor_email = $1
-      ORDER BY name ASC, roll_no ASC`,
-    [normalizeEmail(professorEmail)],
-  );
-  return result.rows;
+  return (await workspaceSnapshot(professorEmail)).students.filter(row => row.active).map(row => studentRow(row, professorEmail));
 }

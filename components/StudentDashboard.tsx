@@ -97,7 +97,7 @@ export default function StudentDashboard({ data }: { data: StudentData }) {
 
         {subjects.length === 0 ? (
           <Card>
-            <EmptyState icon="📚" title="No subject data yet">
+            <EmptyState title="No subject data yet">
               Your professor has not imported attendance or marks for you yet. Check back after the
               next upload.
             </EmptyState>

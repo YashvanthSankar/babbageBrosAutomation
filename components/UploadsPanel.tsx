@@ -79,7 +79,7 @@ export default function UploadsPanel({
   });
 
   const step = STEPS.find((s) => s.id === active)!;
-  const rosterDone = results.roster.status === "done";
+  const rosterDone = results.roster.status === "done" || studentsCount > 0;
 
   const subjectOptions = useMemo(
     () => subjects.map((s) => ({ value: String(s.id), label: subjectLabel(s) })),
@@ -151,7 +151,7 @@ export default function UploadsPanel({
         <CardHeader
           title={`${step.title} import`}
           subtitle={step.description}
-          actions={<Badge tone="accent">POST {step.endpoint}</Badge>}
+          actions={<Badge tone="accent">CSV / Excel</Badge>}
         />
         <div className="card-body stack" style={{ gap: 16 }}>
           {active !== "roster" && !rosterDone ? (
@@ -168,7 +168,7 @@ export default function UploadsPanel({
 
           <div className="form-grid">
             <div className="field">
-              <span className="field-label">CSV file</span>
+              <span className="field-label">CSV or Excel file</span>
               <FileDrop
                 id={`file-${step.id}`}
                 file={files[step.id]}
@@ -201,7 +201,8 @@ export default function UploadsPanel({
                   <input
                     id={`subject-${step.id}`}
                     className="input"
-                    placeholder="Subject ID (no subjects found in dashboard)"
+                    placeholder="Add a subject above first"
+                    disabled
                     value={subjectChoice[step.id]}
                     onChange={(e) =>
                       setSubjectChoice((prev) => ({ ...prev, [step.id]: e.target.value }))
@@ -210,8 +211,8 @@ export default function UploadsPanel({
                 )}
                 <span className="field-hint">
                   {subjectOptions.length > 0
-                    ? "Subjects are derived from the imported roster/marks data."
-                    : "No subjects detected yet — enter the subject ID configured on the server."}
+                    ? "Select the subject this file belongs to."
+                    : "Create a subject using the form above to continue."}
                 </span>
               </div>
             ) : (
@@ -267,9 +268,7 @@ export default function UploadsPanel({
       </Card>
 
       <p className="small muted">
-        Uploads are sent as <span className="mono">multipart/form-data</span> with the CSV in the{" "}
-        <span className="mono">file</span> field and, for attendance/marks, the subject in{" "}
-        <span className="mono">subjectId</span>. Errors are reported per row by the server.
+        Existing records are updated when you reimport them. Any invalid rows are listed with their row number.
       </p>
     </div>
   );
@@ -351,20 +350,20 @@ function FileDrop({
         ref={inputRef}
         id={id}
         type="file"
-        accept=".csv,text/csv"
+        accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="sr-only"
         onChange={(e) => onFile(e.target.files?.[0] ?? null)}
       />
       <div className="dropzone-icon" aria-hidden>
-        {file ? "📄" : "⬆️"}
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4" /></svg>
       </div>
       <div className="dropzone-title">
-        {file ? "File selected" : "Choose a CSV or drag it here"}
+        {file ? "File selected" : "Choose a file or drag it here"}
       </div>
       {file ? (
         <div className="dropzone-file">{file.name}</div>
       ) : (
-        <div className="small muted">CSV only · max size depends on server limits</div>
+        <div className="small muted">CSV or Excel workbook</div>
       )}
     </label>
   );

@@ -1,226 +1,76 @@
-/**
- * Role-scoped dashboard assembly.
- *
- * Admin  -> every student of the professor, with per-subject attendance risk,
- *           latest/previous comparable marks and a trend.
- * Student -> only their own record (matched by the authenticated session email).
- * Phone numbers are never included in a dashboard response.
- */
-import { query } from './db';
-import { getProfessorEmail, normalizeEmail } from './env';
-import {
-  computeSubjectRisk,
-  overallRisk,
-  type RiskLevel,
-  type SubjectRisk,
-  type TestInput,
-  type Trend,
-} from './risk';
-import {
-  listStudentsForProfessor,
-  listSubjectsForProfessor,
-  type StudentRow,
-  type SubjectRow,
-} from './roster';
+/** Assemble role-scoped dashboards from the existing Convex workspace. */
+import { workspaceSnapshot, type WorkspaceSnapshot } from './convex-snapshot';
+import { studentRow, type StudentRow } from './roster';
+import { computeTrend, overallRisk, recoveryClasses, type RiskLevel, type Trend } from './risk';
 
 export interface DashboardSubject {
-  id: number;
-  code: string;
-  name: string;
-  attended: number;
-  total: number;
-  attendancePercent: number | null;
-  classesToRecover: number;
-  latestScore: number | null;
-  previousScore: number | null;
-  latestTestName: string | null;
-  trend: Trend;
-  atRisk: boolean;
+  id: string; code: string; name: string; attended: number; total: number;
+  attendancePercent: number | null; classesToRecover: number;
+  latestScore: number | null; previousScore: number | null; latestTestName: string | null;
+  trend: Trend; atRisk: boolean; riskLevel: RiskLevel; threshold: number;
 }
-
 export interface DashboardStudent {
-  id: number;
-  name: string;
-  rollNo: string;
-  email: string;
-  department: string | null;
-  subjects: DashboardSubject[];
-  riskLevel: RiskLevel;
+  id: string; name: string; rollNo: string; email: string; department: string | null;
+  subjects: DashboardSubject[]; riskLevel: RiskLevel;
 }
-
-export interface DashboardProfessor {
-  email: string;
-  name: string | null;
-}
-
+export interface DashboardProfessor { email: string; name: string | null }
 export interface AdminDashboard {
-  role: 'admin';
-  professor: DashboardProfessor;
+  role: 'admin'; professor: DashboardProfessor;
   stats: { students: number; subjects: number; atRisk: number };
+  subjects: { id: string; name: string; code: string }[];
   students: DashboardStudent[];
 }
+export interface StudentDashboard { role: 'student'; professor: DashboardProfessor; student: DashboardStudent }
 
-export interface StudentDashboard {
-  role: 'student';
-  professor: DashboardProfessor;
-  student: DashboardStudent;
-}
+function round(value: number) { return Math.round(value * 100) / 100; }
 
-interface AttendanceAggregate {
-  attended: number;
-  total: number;
-}
-
-type AggregateMap = Map<string, AttendanceAggregate>;
-type TestMap = Map<string, TestInput[]>;
-
-function key(studentId: number, subjectId: number): string {
-  return `${studentId}:${subjectId}`;
-}
-
-async function loadAggregates(
-  subjects: readonly SubjectRow[],
-): Promise<{ attendance: AggregateMap; tests: TestMap }> {
-  const attendance: AggregateMap = new Map();
-  const tests: TestMap = new Map();
-  const subjectIds = subjects.map((s) => s.id);
-  if (subjectIds.length === 0) return { attendance, tests };
-
-  const attendanceRows = await query<{
-    student_id: number;
-    subject_id: number;
-    total: number;
-    attended: number;
-  }>(
-    `SELECT student_id,
-            subject_id,
-            COUNT(*)::int AS total,
-            COUNT(*) FILTER (WHERE present)::int AS attended
-       FROM attendance_records
-      WHERE subject_id = ANY($1::int[])
-      GROUP BY student_id, subject_id`,
-    [subjectIds],
-  );
-  for (const row of attendanceRows.rows) {
-    attendance.set(key(row.student_id, row.subject_id), {
-      attended: Number(row.attended),
-      total: Number(row.total),
-    });
-  }
-
-  const testRows = await query<{
-    student_id: number;
-    subject_id: number;
-    test_name: string;
-    test_date: string;
-    score: number;
-    max_score: number;
-  }>(
-    `SELECT student_id,
-            subject_id,
-            test_name,
-            test_date::text AS test_date,
-            score::float8 AS score,
-            max_score::float8 AS max_score
-       FROM test_results
-      WHERE subject_id = ANY($1::int[])
-      ORDER BY test_date ASC, id ASC`,
-    [subjectIds],
-  );
-  for (const row of testRows.rows) {
-    const entry = tests.get(key(row.student_id, row.subject_id)) ?? [];
-    entry.push({
-      name: row.test_name,
-      date: row.test_date,
-      score: Number(row.score),
-      maxScore: Number(row.max_score),
-    });
-    tests.set(key(row.student_id, row.subject_id), entry);
-  }
-
-  return { attendance, tests };
-}
-
-function departmentForSubjects(subjects: readonly SubjectRow[]): string | null {
-  return subjects.find((s) => Boolean(s.department))?.department ?? null;
-}
-
-function buildStudent(
-  student: StudentRow,
-  subjects: readonly SubjectRow[],
-  attendance: AggregateMap,
-  tests: TestMap,
-): DashboardStudent {
-  const subjectRisks: SubjectRisk[] = subjects.map((subject) => {
-    const aggregate = attendance.get(key(student.id, subject.id)) ?? { attended: 0, total: 0 };
-    const subjectTests = tests.get(key(student.id, subject.id)) ?? [];
-    return computeSubjectRisk({
-      id: subject.id,
-      code: subject.code,
-      name: subject.name,
-      attended: aggregate.attended,
-      total: aggregate.total,
-      tests: subjectTests,
-    });
+function buildStudent(student: StudentRow, snapshot: WorkspaceSnapshot): DashboardStudent {
+  const subjects: DashboardSubject[] = snapshot.subjects.map(subject => {
+    const records = snapshot.attendanceRecords.filter(row => row.studentId === student.id && row.subjectId === subject._id);
+    const attended = records.filter(row => row.status === 'P').length;
+    const total = records.length;
+    const percentage = total ? attended / total * 100 : null;
+    const threshold = subject.attendanceThreshold ?? 85;
+    const tests = snapshot.marksRecords
+      .filter(row => row.studentId === student.id && row.subjectId === subject._id)
+      .map(row => ({ row, assessment: snapshot.assessments.find(test => test._id === row.assessmentId) }))
+      .filter(test => test.assessment)
+      .sort((a,b) => a.assessment!.assessmentDate.localeCompare(b.assessment!.assessmentDate));
+    const latest = tests.at(-1), previous = tests.at(-2);
+    const latestScore = latest ? round(latest.row.percentage) : null;
+    const previousScore = previous ? round(previous.row.percentage) : null;
+    const trend = computeTrend(latestScore, previousScore);
+    const weakMarks = latestScore !== null && latestScore < (subject.marksThreshold ?? 50);
+    const fallingMarks = latestScore !== null && previousScore !== null && previousScore - latestScore >= 10;
+    const attendanceAtRisk = percentage !== null && percentage < threshold;
+    const riskLevel: RiskLevel = attendanceAtRisk || weakMarks || fallingMarks ? 'high'
+      : percentage !== null && percentage < threshold + 5 ? 'warn'
+      : percentage === null && latestScore === null ? 'unknown' : 'ok';
+    return {
+      id: subject._id, code: subject.code ?? subject.name, name: subject.name, attended, total,
+      attendancePercent: percentage === null ? null : round(percentage),
+      classesToRecover: recoveryClasses(attended,total,threshold), latestScore, previousScore,
+      latestTestName: latest?.assessment?.name ?? null, trend,
+      atRisk: attendanceAtRisk || weakMarks || fallingMarks, riskLevel, threshold,
+    };
   });
-
-  return {
-    id: student.id,
-    name: student.name,
-    rollNo: student.roll_no,
-    email: student.email,
-    department: departmentForSubjects(subjects),
-    subjects: subjectRisks.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      attended: r.attended,
-      total: r.total,
-      attendancePercent: r.attendancePercent,
-      classesToRecover: r.classesToRecover,
-      latestScore: r.latestScore,
-      previousScore: r.previousScore,
-      latestTestName: r.latestTestName,
-      trend: r.trend,
-      atRisk: r.atRisk,
-    })),
-    riskLevel: overallRisk(subjectRisks.map((r) => r.riskLevel)),
-  };
-}
-
-function professorFor(email: string): DashboardProfessor {
-  return { email: normalizeEmail(email), name: null };
+  return { id: student.id, name: student.name, rollNo: student.roll_no, email: student.email,
+    department: snapshot.subjects.find(row => row.department)?.department ?? null,
+    subjects, riskLevel: overallRisk(subjects.map(subject => subject.riskLevel)) };
 }
 
 export async function getAdminDashboard(professorEmail: string): Promise<AdminDashboard> {
-  const email = normalizeEmail(professorEmail || getProfessorEmail());
-  const [students, subjects] = await Promise.all([
-    listStudentsForProfessor(email),
-    listSubjectsForProfessor(email),
-  ]);
-  const { attendance, tests } = await loadAggregates(subjects);
-
-  const built = students.map((student) => buildStudent(student, subjects, attendance, tests));
-
-  return {
-    role: 'admin',
-    professor: professorFor(email),
-    stats: {
-      students: built.length,
-      subjects: subjects.length,
-      atRisk: built.filter((s) => s.riskLevel === 'high' || s.riskLevel === 'warn').length,
-    },
-    students: built,
-  };
+  const snapshot = await workspaceSnapshot(professorEmail);
+  const students = snapshot.students.filter(row => row.active).map(row => buildStudent(studentRow(row,professorEmail),snapshot));
+  const rank: Record<RiskLevel,number> = { high:0, warn:1, ok:2, unknown:3 };
+  students.sort((a,b) => rank[a.riskLevel]-rank[b.riskLevel]
+    || Math.min(...a.subjects.map(s=>s.attendancePercent ?? 101))-Math.min(...b.subjects.map(s=>s.attendancePercent ?? 101))
+    || a.name.localeCompare(b.name));
+  return { role:'admin', professor:{email:professorEmail,name:snapshot.teacher?.name ?? null},
+    stats:{students:students.length,subjects:snapshot.subjects.length,atRisk:students.filter(s=>s.riskLevel==='high').length},
+    subjects:snapshot.subjects.map(s=>({id:s._id,name:s.name,code:s.code ?? s.name})), students };
 }
-
 export async function getStudentDashboard(student: StudentRow): Promise<StudentDashboard> {
-  const email = normalizeEmail(student.professor_email);
-  const subjects = await listSubjectsForProfessor(email);
-  const { attendance, tests } = await loadAggregates(subjects);
-  return {
-    role: 'student',
-    professor: professorFor(email),
-    student: buildStudent(student, subjects, attendance, tests),
-  };
+  const snapshot = await workspaceSnapshot(student.professor_email);
+  return { role:'student', professor:{email:student.professor_email,name:snapshot.teacher?.name ?? null},student:buildStudent(student,snapshot) };
 }

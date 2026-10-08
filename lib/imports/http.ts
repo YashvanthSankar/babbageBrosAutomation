@@ -47,11 +47,10 @@ export function toRowErrors(items: readonly { row?: number; message: string }[])
 }
 
 /** Parse a `subjectId` form field into a positive integer. */
-export function parseSubjectId(value: FormDataEntryValue | null): number {
+export function parseSubjectId(value: FormDataEntryValue | null): string {
   const raw = typeof value === 'string' ? value.trim() : '';
-  const parsed = Number(raw);
-  if (!raw || !Number.isInteger(parsed) || parsed <= 0) {
+  if (!raw) {
     throw new ApiError(422, 'VALIDATION_ERROR', 'Choose a valid subject.');
   }
-  return parsed;
+  return raw;
 }

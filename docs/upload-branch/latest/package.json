@@ -1,0 +1,37 @@
+{
+  "name": "attendly",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy",
+    "db:seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "convex": "^1.28.0",
+    "exceljs": "^4.4.0",
+    "jose": "^6.1.0",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.6",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "postcss": "^8.5.23",
+    "uuid": "^11.1.1"
+  }
+}
+

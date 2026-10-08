@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "convex": "^1.46.0",
     "exceljs": "^4.4.0",
     "next": "^14.2.35",
     "next-auth": "^4.24.13",

@@ -107,7 +107,7 @@ export default function Dashboard() {
       <div className="demo-banner" role="note">
         <div className="container">
           <strong>{DEMO_WARNING}</strong>{" "}
-          Your role is assigned by the server from the account email — there is no role selector.
+          Attendance, marks and appointments in one place.
         </div>
       </div>
 
@@ -153,7 +153,7 @@ export default function Dashboard() {
             Demo session scoped to the professor’s roster. Students never see other students’
             records; all data is synthetic.
           </span>
-          <span className="mono">/api/dashboard</span>
+          <span>IIITDM · Student Success</span>
         </div>
       </footer>
     </div>
@@ -170,7 +170,7 @@ function Landing() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     const normalizedPhone = phone.trim();
     if (!cleanEmail.endsWith("@iiitdm.ac.in")) {
       setError("Use your @iiitdm.ac.in email address.");
@@ -180,7 +180,7 @@ function Landing() {
       setError("Enter your name, institute email, phone number, and password.");
       return;
     }
-    if (!/^\\+91[6-9]\\d{9}$/.test(normalizedPhone)) {
+    if (!/^\+91[6-9]\d{9}$/.test(normalizedPhone)) {
       setError("Use an Indian phone number in E.164 format, for example +919876543210.");
       return;
     }
@@ -247,8 +247,7 @@ function Landing() {
               <p className="hero-lead">
                 One dashboard for the professor to import rosters, attendance, and marks — and for
                 each student to see their own attendance, scores, recovery plan, and book an
-                appointment slot. Sign in with your institute email and password: the server decides whether you are
-                the professor/admin or a student, so there is no role toggle to mis-set.
+                appointment slot. Use your institute email to open your dashboard.
               </p>
 
               <ul className="feature-list">

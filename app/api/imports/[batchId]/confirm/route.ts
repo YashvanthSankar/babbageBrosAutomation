@@ -21,8 +21,8 @@ export async function POST(
     const session = requireAdmin(await getSession());
     const professorEmail = sessionEmail(session);
 
-    const batchId = Number(context.params.batchId);
-    if (!Number.isInteger(batchId) || batchId <= 0) {
+    const batchId = context.params.batchId;
+    if (!batchId) {
       throw new ApiError(404, 'BATCH_UNAVAILABLE', 'This preview was not found.');
     }
 

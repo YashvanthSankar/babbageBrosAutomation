@@ -13,7 +13,9 @@
 import type { NextRequest } from 'next/server';
 import type { NextResponse } from 'next/server';
 import { ApiError, handleRoute, json } from '@/lib/api';
-import { query, withTransaction } from '@/lib/db';
+import { integrationMutation } from '@/lib/integrations-store';
+import { googleBusy, createGoogleBooking } from '@/lib/google-calendar';
+import { hasProfessorRefreshToken } from '@/lib/tokens';
 import { getMaxBookingMinutes, getMinBookingMinutes } from '@/lib/env';
 import { findStudentByEmail, findSubjectById } from '@/lib/roster';
 import { getSession, requireSession, sessionEmail } from '@/lib/session';
@@ -45,8 +47,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const payload = (body ?? {}) as { subjectId?: unknown; start?: unknown; end?: unknown };
 
-    const subjectId = Number(payload.subjectId);
-    if (!Number.isInteger(subjectId) || subjectId <= 0) {
+    const subjectId = String(payload.subjectId??'');
+    if (!subjectId) {
       throw new ApiError(400, 'INVALID_SUBJECT', 'subjectId must be a positive integer.');
     }
 
@@ -95,47 +97,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Transactional reservation: serialize bookings per professor and re-check
     // local overlap inside the lock.
-    const booking = await withTransaction(async (client) => {
-      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        subject.professor_email,
-      ]);
-      const clash = await client.query<{ id: number }>(
-        `SELECT id
-           FROM bookings
-          WHERE professor_email = $1
-            AND status IN ('pending', 'confirmed')
-            AND starts_at < $3
-            AND ends_at > $2
-          LIMIT 1`,
-        [subject.professor_email, startIso, endIso],
-      );
-      if (clash.rowCount && clash.rowCount > 0) {
-        throw new ApiError(
-          409,
-          'SLOT_UNAVAILABLE',
-          'That slot was just booked. Please choose another time.',
-        );
-      }
-      const inserted = await client.query<BookingRow>(
-        `INSERT INTO bookings (student_id, subject_id, professor_email, starts_at, ends_at, status)
-              VALUES ($1, $2, $3, $4, $5, 'pending')
-           RETURNING id, starts_at, ends_at, status`,
-        [student.id, subject.id, subject.professor_email, startIso, endIso],
-      );
-      return inserted.rows[0];
-    });
-
-    await query(
-      `UPDATE bookings SET status = 'confirmed', updated_at = now() WHERE id = $1`,
-      [booking.id],
-    );
+    const calendarConnected=await hasProfessorRefreshToken(subject.professor_email);
+    if(calendarConnected && (await googleBusy(subject.professor_email,startIso,endIso)).length) throw new ApiError(409,'SLOT_UNAVAILABLE','This time is occupied in the professor calendar.');
+    let bookingId:string;
+    try{bookingId=await integrationMutation('reserve',{studentId:student.id,subjectId:subject.id,professorEmail:subject.professor_email,start:startIso,end:endIso});}
+    catch(error){if(error instanceof Error&&error.message.includes('SLOT_UNAVAILABLE'))throw new ApiError(409,'SLOT_UNAVAILABLE','That slot was just booked. Choose another time.');throw error;}
+    try {
+      const googleEventId=calendarConnected?await createGoogleBooking(subject.professor_email,{start:startIso,end:endIso,studentEmail:email,studentName:student.name,subjectName:subject.name,bookingId}):undefined;
+      await integrationMutation('finishBooking',{id:bookingId,status:'confirmed',...(googleEventId?{googleEventId}:{})});
+    }catch(error){await integrationMutation('finishBooking',{id:bookingId,status:'failed'});throw error;}
 
     return json(
       {
         booking: {
-          id: booking.id,
-          start: new Date(booking.starts_at).toISOString(),
-          end: new Date(booking.ends_at).toISOString(),
+          id: bookingId,
+          start: startIso,
+          end: endIso,
           status: 'confirmed',
         },
       },

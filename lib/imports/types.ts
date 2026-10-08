@@ -45,12 +45,12 @@ export type MarksEntry = {
 export type RosterPayload = { kind: 'roster'; rows: RosterRow[] };
 export type AttendancePayload = {
   kind: 'attendance';
-  subjectId: number;
+  subjectId: string;
   entries: AttendanceEntry[];
 };
 export type MarksPayload = {
   kind: 'marks';
-  subjectId: number | null;
+  subjectId: string | null;
   entries: MarksEntry[];
 };
 
@@ -62,4 +62,4 @@ export type ParseResult<T> = {
   preview: Record<string, unknown>[];
 };
 
-export type KnownStudent = { id: number; rollNumber: string; active: boolean };
+export type KnownStudent = { id: string; rollNumber: string; active: boolean };

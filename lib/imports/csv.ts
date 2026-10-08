@@ -178,7 +178,7 @@ function normalizeStatus(raw: string): 'P' | 'A' | null {
 
 export function parseAttendanceCsv(
   text: string,
-  subjectId: number,
+  subjectId: string,
   knownStudents: KnownStudent[],
 ): ParseResult<AttendancePayload> {
   const table = parseCsv(text);
@@ -274,7 +274,7 @@ export function parseAttendanceCsv(
   };
 }
 
-export function parseMarksCsv(text: string, subjectId: number | null): ParseResult<MarksPayload> {
+export function parseMarksCsv(text: string, subjectId: string | null): ParseResult<MarksPayload> {
   const table = parseCsv(text);
   const errors: ValidationItem[] = [];
   const warnings: ValidationItem[] = [];

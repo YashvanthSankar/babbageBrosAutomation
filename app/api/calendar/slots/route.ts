@@ -8,7 +8,9 @@
 import type { NextRequest } from 'next/server';
 import type { NextResponse } from 'next/server';
 import { ApiError, handleRoute, json } from '@/lib/api';
-import { query } from '@/lib/db';
+import { integrationQuery } from '@/lib/integrations-store';
+import { googleBusy } from '@/lib/google-calendar';
+import { hasProfessorRefreshToken } from '@/lib/tokens';
 import {
   getCalendarTimeZone,
   getSlotMinutes,
@@ -40,10 +42,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const session = requireSession(await getSession());
     const email = sessionEmail(session);
 
-    const subjectId = Number(request.nextUrl.searchParams.get('subjectId'));
+    const subjectId = (request.nextUrl.searchParams.get('subjectId')??'').trim();
     const date = (request.nextUrl.searchParams.get('date') ?? '').trim();
 
-    if (!Number.isInteger(subjectId) || subjectId <= 0) {
+    if (!subjectId) {
       throw new ApiError(400, 'INVALID_SUBJECT', 'subjectId must be a positive integer.');
     }
     if (!isValidIsoDate(date)) {
@@ -71,20 +73,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const timeZone = getCalendarTimeZone();
     const { start: dayStart, end: dayEnd } = dayBoundsUtc(date, timeZone);
 
-    const localBookings = await query<{ starts_at: Date; ends_at: Date }>(
-      `SELECT starts_at, ends_at
-         FROM bookings
-        WHERE professor_email = $1
-          AND status IN ('pending', 'confirmed')
-          AND starts_at < $3
-          AND ends_at > $2`,
-      [subject.professor_email, dayStart.toISOString(), dayEnd.toISOString()],
-    );
-
-    const busy: BusyIntervalMs[] = localBookings.rows.map((row) => ({
-      startMs: new Date(row.starts_at).getTime(),
-      endMs: new Date(row.ends_at).getTime(),
-    }));
+    const localBookings = await integrationQuery('bookings',{professorEmail:subject.professor_email});
+    const busy: BusyIntervalMs[] = localBookings.map((row:{start:string;end:string}) => ({startMs:new Date(row.start).getTime(),endMs:new Date(row.end).getTime()}));
+    const calendarConnected = await hasProfessorRefreshToken(subject.professor_email);
+    if(calendarConnected) {
+      const external=await googleBusy(subject.professor_email,dayStart.toISOString(),dayEnd.toISOString());
+      busy.push(...external.map(row=>({startMs:new Date(row.start).getTime(),endMs:new Date(row.end).getTime()})));
+    }
 
     const { hour: startHour, minute: startMinute } = getWorkdayStart();
     const { hour: endHour, minute: endMinute } = getWorkdayEnd();
@@ -116,9 +111,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       slots,
       date,
       timeZone,
-      source: 'local',
-      calendarConnected: false,
-      warning: 'Availability is managed through appointment slots in this app.',
+      source: calendarConnected?'google':'local',
+      calendarConnected,
+      warning: calendarConnected?undefined:'Google Calendar is not connected. These slots use appointments recorded in this app.',
     });
   });
 }

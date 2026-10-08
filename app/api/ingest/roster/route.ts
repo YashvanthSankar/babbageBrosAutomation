@@ -37,6 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? await parseRosterWorkbook(file.buffer)
         : parseRosterCsv(file.buffer.toString('utf8'));
 
+    if (result.report.errors.length) return json({ imported: 0, updated: 0, errors: toRowErrors(result.report.errors) });
     const applied = await applyRoster(professorEmail, result.payload.rows);
     return json({
       imported: applied.imported,

@@ -26,9 +26,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     const rawSubject = form.get('subjectId');
     const subjectId =
       typeof rawSubject === 'string' && rawSubject.trim() !== ''
-        ? Number(rawSubject)
+        ? rawSubject.trim()
         : null;
-    if (subjectId !== null && (!Number.isInteger(subjectId) || subjectId <= 0)) {
+    if (subjectId !== null && !subjectId) {
       throw new ApiError(422, 'VALIDATION_ERROR', 'Choose a valid subject.');
     }
     if (subjectId !== null) {
@@ -50,6 +50,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const result = parseMarksCsv(file.buffer.toString('utf8'), subjectId);
+    if (result.report.errors.length) return json({ imported: 0, updated: 0, errors: toRowErrors(result.report.errors) });
     const applied = await applyMarks(professorEmail, subjectId, result.payload.entries);
     return json({
       imported: applied.imported,

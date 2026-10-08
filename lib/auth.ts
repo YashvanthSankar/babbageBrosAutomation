@@ -6,7 +6,9 @@
 import { createHash } from 'node:crypto';
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { query } from './db';
+import GoogleProvider from 'next-auth/providers/google';
+import { hasProfessorRefreshToken, saveProfessorToken } from './tokens';
+import { convexApi, convexClient, convexSecret } from './convex';
 import { getProfessorEmail, isProfessorEmail, isStudentDomainEmail, normalizeEmail } from './env';
 import { findStudentByEmail } from './roster';
 
@@ -24,18 +26,16 @@ function loginRollNumber(email: string): string {
   return `LOGIN-${createHash('sha256').update(email).digest('hex').slice(0, 12).toUpperCase()}`;
 }
 
-async function provisionStudent(email: string, name: string, phone: string): Promise<{ id: number; name: string } | null> {
+async function provisionStudent(email: string, name: string, phone: string): Promise<{ id: string; name: string } | null> {
   const professorEmail = getProfessorEmail();
   if (!professorEmail) return null;
-  const result = await query<{ id: number; name: string }>(
-    `INSERT INTO students (name, roll_no, email, phone, professor_email, active, updated_at)
-     VALUES ($1, $2, $3, $4, $5, true, now())
-     ON CONFLICT (email) DO UPDATE
-       SET name = EXCLUDED.name, phone = EXCLUDED.phone, active = true, updated_at = now()
-     RETURNING id, name`,
-    [name.trim(), loginRollNumber(email), email, phone.trim(), professorEmail],
-  );
-  return result.rows[0] ?? null;
+  const teacher = await convexClient().mutation(convexApi.upsertDemoTeacher,{secret:convexSecret(),email:professorEmail,name:'Professor'});
+  const students=await convexClient().query(convexApi.listStudents,{secret:convexSecret(),teacherId:teacher.id});
+  const existing=students.find((s:{email:string})=>s.email===email);
+  const result=existing
+    ? await convexClient().mutation(convexApi.updateStudent,{secret:convexSecret(),teacherId:teacher.id,id:existing._id,changes:{name:name.trim(),phone:phone.trim()}})
+    : await convexClient().mutation(convexApi.createStudent,{secret:convexSecret(),teacherId:teacher.id,student:{rollNumber:loginRollNumber(email),name:name.trim(),email,phone:phone.trim()}});
+  return {id:String(result.id??result._id??result),name:name.trim()};
 }
 
 export const authOptions: NextAuthOptions = {
@@ -57,20 +57,33 @@ export const authOptions: NextAuthOptions = {
         const name = credentials?.name ?? '';
         const phone = credentials?.phone ?? '';
         if (!isStudentDomainEmail(email) || !password.trim() || !validName(name) || !validPhone(phone)) return null;
-        if (isProfessorEmail(email)) return { id: email, email, name: name.trim() };
+        if (isProfessorEmail(email)) {
+          await convexClient().mutation(convexApi.upsertDemoTeacher,{secret:convexSecret(),email,name:name.trim(),phone:phone.trim()});
+          return { id: email, email, name: name.trim() };
+        }
         const student = await provisionStudent(email, name, phone);
         return student ? { id: String(student.id), email, name: student.name } : null;
       },
     }),
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [GoogleProvider({
+      id:'google-professor',name:'Connect professor Google Calendar',
+      clientId:process.env.GOOGLE_CLIENT_ID,clientSecret:process.env.GOOGLE_CLIENT_SECRET,
+      authorization:{params:{scope:'openid email profile https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events',access_type:'offline',prompt:'consent'}},
+    })] : []),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
+      if(account?.provider==='google-professor') return isProfessorEmail(user.email) && (profile as {email_verified?:boolean})?.email_verified===true;
       return account?.provider === DEMO_CREDENTIALS_PROVIDER_ID && isStudentDomainEmail(user.email);
     },
-    async jwt({ token }) {
+    async jwt({ token,account }) {
       const email = normalizeEmail(token.email ?? '');
       token.role = isProfessorEmail(email) ? 'admin' : 'student';
       token.studentId = token.role === 'student' ? (await findStudentByEmail(email))?.id ?? null : null;
+      if(token.role==='admin') {
+        if(account?.provider==='google-professor' && account.refresh_token) await saveProfessorToken(email,account.refresh_token);
+        token.hasCalendar=await hasProfessorRefreshToken(email);
+      }
       return token;
     },
     async session({ session, token }) {
@@ -78,6 +91,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = String(token.sub ?? '');
         session.user.role = token.role === 'admin' ? 'admin' : 'student';
         session.user.studentId = token.studentId ?? null;
+        session.user.hasCalendar = Boolean(token.hasCalendar);
       }
       return session;
     },

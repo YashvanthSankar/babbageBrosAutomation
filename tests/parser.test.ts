@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { parseAttendanceWorkbook, parseRosterWorkbook } from "@/lib/imports/parser";
+import { parseAttendanceWorkbook, parseMarksWorkbook, parseRosterWorkbook } from "@/lib/imports/parser";
 
 async function workbookBuffer(rows: unknown[][]) {
   const workbook = new ExcelJS.Workbook();
@@ -31,10 +31,28 @@ describe("roster parser", () => {
   });
 });
 
+describe("marks parser", () => {
+  const known = [{ id: "student-1", rollNumber: "CS001", active: true }];
+
+  it("normalizes valid marks and calculates preview percentages", async () => {
+    const buffer = await workbookBuffer([["roll_number", "marks_obtained"], ["CS001", 42]]);
+    const result = await parseMarksWorkbook(buffer, { subjectId: "subject-1", assessmentName: "Quiz 1", assessmentDate: "2026-10-08", maxMarks: 50 }, known);
+    expect(result.report.errors).toEqual([]);
+    expect(result.payload.entries[0]).toMatchObject({ rollNumber: "CS001", score: 42, maxScore: 50 });
+    expect(result.preview[0].percentage).toBe(84);
+  });
+
+  it("rejects marks above the maximum and unknown students", async () => {
+    const buffer = await workbookBuffer([["roll_number", "marks_obtained"], ["UNKNOWN", 51]]);
+    const result = await parseMarksWorkbook(buffer, { subjectId: "subject-1", assessmentName: "Quiz 1", assessmentDate: "2026-10-08", maxMarks: 50 }, known);
+    expect(result.report.errors.map((error) => error.code)).toEqual(expect.arrayContaining(["UNKNOWN_STUDENT", "INVALID_MARKS"]));
+  });
+});
+
 describe("attendance parser", () => {
   const known = [
-    { id: 1, rollNumber: "CS001", active: true },
-    { id: 2, rollNumber: "CS002", active: true },
+    { id: 'student-1', rollNumber: "CS001", active: true },
+    { id: 'student-2', rollNumber: "CS002", active: true },
   ];
 
   it("normalizes statuses and skips blank cells", async () => {
@@ -43,7 +61,7 @@ describe("attendance parser", () => {
       ["CS001", "p", ""],
       ["CS002", "A", "P"],
     ]);
-    const result = await parseAttendanceWorkbook(buffer, 1, known);
+    const result = await parseAttendanceWorkbook(buffer, 'subject-1', known);
     expect(result.report.errors).toEqual([]);
     expect(result.report.summary).toMatchObject({ studentRows: 2, dates: 2, records: 3, blankCells: 1 });
     expect(result.payload.entries.map((entry) => entry.status)).toEqual(["P", "A", "P"]);
@@ -55,7 +73,7 @@ describe("attendance parser", () => {
       ["roll_number", "2026-10-01", "2026-10-01"],
       ["UNKNOWN", "P", "late"],
     ]);
-    const result = await parseAttendanceWorkbook(buffer, 1, known);
+    const result = await parseAttendanceWorkbook(buffer, 'subject-1', known);
     expect(result.report.errors.map((error) => error.code)).toEqual(expect.arrayContaining(["DUPLICATE_DATE", "UNKNOWN_STUDENT"]));
   });
 });
