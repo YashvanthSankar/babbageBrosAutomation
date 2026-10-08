@@ -101,7 +101,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if(calendarConnected && (await googleBusy(subject.professor_email,startIso,endIso)).length) throw new ApiError(409,'SLOT_UNAVAILABLE','This time is occupied in the professor calendar.');
     let bookingId:string;
     try{bookingId=await integrationMutation('reserve',{studentId:student.id,subjectId:subject.id,professorEmail:subject.professor_email,start:startIso,end:endIso});}
-    catch(error){if(error instanceof Error&&error.message.includes('SLOT_UNAVAILABLE'))throw new ApiError(409,'SLOT_UNAVAILABLE','That slot was just booked. Choose another time.');throw error;}
+    catch(error){
+      const data=error && typeof error==='object' && 'data' in error ? String(error.data) : '';
+      if(data==='SLOT_UNAVAILABLE'||error instanceof Error&&error.message.includes('SLOT_UNAVAILABLE'))throw new ApiError(409,'SLOT_UNAVAILABLE','That slot was just booked. Choose another time.');
+      throw error;
+    }
     try {
       const googleEventId=calendarConnected?await createGoogleBooking(subject.professor_email,{start:startIso,end:endIso,studentEmail:email,studentName:student.name,subjectName:subject.name,bookingId}):undefined;
       await integrationMutation('finishBooking',{id:bookingId,status:'confirmed',...(googleEventId?{googleEventId}:{})});

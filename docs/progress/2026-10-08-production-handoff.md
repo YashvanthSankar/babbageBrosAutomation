@@ -19,3 +19,7 @@
 - Runtime uploads and professor/student access against Convex production
   passed. Fixed expected booking-conflict errors to survive Convex transport
   and return HTTP 409 to the student.
+- Approved controlled OmniDimension call returned HTTP 200 and `dispatched`.
+  Resend returned HTTP 403: its default sender is restricted to the account
+  owner's email until a sender domain is verified. Student email delivery
+  requires that configuration; no successful delivery is claimed.
