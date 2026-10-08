@@ -23,7 +23,7 @@ export async function stageImport(input:StageImportInput):Promise<StagedImport> 
  const result=await convexClient().mutation(convexApi.stageImport,{secret:convexSecret(),teacherId:await getProfessorTeacherId(input.professorEmail),...(input.subjectId?{subjectId:input.subjectId}:{}),type:input.type,filename:input.filename,checksum:createHash('sha256').update(input.buffer).digest('hex'),payload:input.payload,report:input.report});
  return {batchId:result.batchId,expiresAt:new Date(result.expiresAt).toISOString(),canConfirm:input.report.errors.length===0,report:input.report,preview:input.preview};
 }
-export interface ConfirmedImport {batchId:string;type:string;processed:number}
+export interface ConfirmedImport {batchId:string;type:string;processed:number;inserted:number;updated:number}
 export async function confirmBatch(email:string,batchId:string):Promise<ConfirmedImport> {
  let before: {studentId:string;subjectId:string;attendancePercentage:number|null;threshold:number}[]=[];
  let beforeLoaded=false;
@@ -53,7 +53,7 @@ export async function confirmBatch(email:string,batchId:string):Promise<Confirme
 async function apply(email:string,payload:ImportPayload):Promise<ApplyResult> {
  const staged=await stageImport({professorEmail:email,filename:'dashboard-upload',buffer:Buffer.from(JSON.stringify(payload)),type:payload.kind,payload,report:{errors:[],warnings:[],summary:{}},preview:[],subjectId:payload.kind==='roster'?null:payload.subjectId});
  const result=await confirmBatch(email,staged.batchId);
- return {imported:result.processed,updated:0,errors:[]};
+ return {imported:result.inserted,updated:result.updated,errors:[]};
 }
 export function applyRoster(email:string,rows:readonly RosterRow[]):Promise<ApplyResult>{return apply(email,{kind:'roster',rows:[...rows]});}
 export function applyAttendance(email:string,subjectId:string,entries:readonly AttendanceEntry[]):Promise<ApplyResult>{return apply(email,{kind:'attendance',subjectId,entries:[...entries]});}

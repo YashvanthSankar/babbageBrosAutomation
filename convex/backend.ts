@@ -133,6 +133,8 @@ export const confirmImport = mutation({
     if (batch.validationReport.errors?.length) throw new Error("BATCH_HAS_ERRORS");
     await ctx.db.patch(batch._id, { status: "processing" });
     let processed = 0;
+    let inserted = 0;
+    let updated = 0;
     if (batch.type === "roster") {
       for (const row of batch.parsedPayload.rows) {
         const normalizedRoll = normalize(row.rollNumber);
@@ -141,8 +143,8 @@ export const confirmImport = mutation({
         if (byRoll && byEmail && byRoll._id !== byEmail._id) throw new Error("ROSTER_IDENTITY_CONFLICT");
         const existing = byRoll ?? byEmail;
         const values = { rollNumber: row.rollNumber, normalizedRoll, name: row.name, email: row.email, phone: row.phone, active: true, updatedAt: Date.now() };
-        if (existing) await ctx.db.patch(existing._id, values);
-        else await ctx.db.insert("students", { teacherId: args.teacherId, ...values, createdAt: Date.now() });
+        if (existing) { await ctx.db.patch(existing._id, values); updated += 1; }
+        else { await ctx.db.insert("students", { teacherId: args.teacherId, ...values, createdAt: Date.now() }); inserted += 1; }
         processed += 1;
       }
     } else if (batch.type === "attendance") {
@@ -152,8 +154,8 @@ export const confirmImport = mutation({
         if (!student) throw new Error(`STUDENT_NOT_FOUND:${entry.rollNumber}`);
         const existing = await ctx.db.query("attendanceRecords").withIndex("by_student_subject_date", (q: any) => q.eq("studentId", student._id).eq("subjectId", batch.parsedPayload.subjectId).eq("attendanceDate", entry.date)).unique();
         const values = { status: entry.status, sourceImportId: batch._id, updatedAt: Date.now() };
-        if (existing) await ctx.db.patch(existing._id, values);
-        else await ctx.db.insert("attendanceRecords", { studentId: student._id, subjectId: batch.parsedPayload.subjectId, attendanceDate: entry.date, ...values, createdAt: Date.now() });
+        if (existing) { await ctx.db.patch(existing._id, values); updated += 1; }
+        else { await ctx.db.insert("attendanceRecords", { studentId: student._id, subjectId: batch.parsedPayload.subjectId, attendanceDate: entry.date, ...values, createdAt: Date.now() }); inserted += 1; }
         processed += 1;
       }
     } else {
@@ -181,14 +183,14 @@ export const confirmImport = mutation({
         if (!student || !assessment) throw new Error("STUDENT_NOT_FOUND");
         const existing = await ctx.db.query("marksRecords").withIndex("by_student_assessment", (q: any) => q.eq("studentId", student._id).eq("assessmentId", assessment._id)).unique();
         const values = { marksObtained: entry.score, percentage: (entry.score / entry.maxScore) * 100, sourceImportId: batch._id, updatedAt: Date.now() };
-        if (existing) await ctx.db.patch(existing._id, values);
-        else await ctx.db.insert("marksRecords", { studentId: student._id, subjectId, assessmentId: assessment._id, ...values, createdAt: Date.now() });
+        if (existing) { await ctx.db.patch(existing._id, values); updated += 1; }
+        else { await ctx.db.insert("marksRecords", { studentId: student._id, subjectId, assessmentId: assessment._id, ...values, createdAt: Date.now() }); inserted += 1; }
         processed += 1;
       }
     }
 
     await ctx.db.patch(batch._id, { status: "confirmed", confirmedAt: Date.now() });
-    return { batchId: batch._id, type: batch.type, processed };
+    return { batchId: batch._id, type: batch.type, processed, inserted, updated };
   },
 });
 
