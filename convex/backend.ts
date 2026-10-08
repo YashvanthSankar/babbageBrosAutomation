@@ -114,7 +114,16 @@ export const updateSubject = mutation({
 });
 
 export const stageImport = mutation({
-  args: { secret: v.string(), teacherId: v.any(), subjectId: v.optional(v.any()), type: v.string(), filename: v.string(), checksum: v.string(), payload: v.any(), report: v.any() },
+  args: {
+    secret: v.string(),
+    teacherId: v.any(),
+    subjectId: v.optional(v.any()),
+    type: v.union(v.literal("roster"), v.literal("attendance"), v.literal("marks")),
+    filename: v.string(),
+    checksum: v.string(),
+    payload: v.any(),
+    report: v.any(),
+  },
   handler: async (ctx, args) => {
     authorize(args.secret); await requireTeacher(ctx, args.teacherId);
     if (args.subjectId) await requireSubject(ctx, args.teacherId, args.subjectId);
