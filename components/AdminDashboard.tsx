@@ -46,6 +46,8 @@ export default function AdminDashboard({
   const [department, setDepartment] = useState("");
   const [subjectError, setSubjectError] = useState<string | null>(null);
   const [savingSubject, setSavingSubject] = useState(false);
+  const [demoPhone, setDemoPhone] = useState("");
+  const [demoCallState, setDemoCallState] = useState<CallStatus>({ state: "idle" });
   useEffect(() => {
     apiGet<{ subjects: SubjectStat[] }>("/api/subjects").then((result) => {
       if (result.ok) setOwnedSubjects(result.data?.subjects ?? []);
@@ -63,6 +65,20 @@ export default function AdminDashboard({
     setOwnedSubjects((previous) => [...previous, result.data!]);
     setSubjectName(""); setSubjectCode(""); setDepartment("");
     onChanged();
+  }
+
+  async function dispatchDemoCall(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const phone = demoPhone.trim();
+    if (!/^\+91[6-9]\d{9}$/.test(phone)) {
+      setDemoCallState({ state: "error", message: "Enter an Indian number in +91 E.164 format." });
+      return;
+    }
+    setDemoCallState({ state: "pending" });
+    const result = await apiPostJson<{ call?: { attendancePercentage?: number } }>("/api/voice/demo-call", { phone });
+    setDemoCallState(result.ok
+      ? { state: "success", message: "Demo call dispatched with 69% attendance context." }
+      : { state: "error", message: result.error ?? "Could not dispatch the demo call." });
   }
 
   const students = data.students ?? [];
@@ -153,6 +169,44 @@ export default function AdminDashboard({
           hint="Computed from imported attendance"
         />
       </div>
+
+      <Card padded={false} className="demo-call-card">
+        <CardHeader
+          title="Call your number for example"
+          subtitle="Hear the attendance-risk agent as a student currently at 69% attendance."
+          actions={<Badge tone="danger">69% attendance</Badge>}
+        />
+        <div className="card-body">
+          <form className="demo-call-form" onSubmit={dispatchDemoCall}>
+            <label className="field demo-call-field">
+              <span className="field-label">Your phone number</span>
+              <input
+                className="input"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="+919876543210"
+                value={demoPhone}
+                onChange={(event) => {
+                  setDemoPhone(event.target.value);
+                  if (demoCallState.state !== "idle") setDemoCallState({ state: "idle" });
+                }}
+                disabled={demoCallState.state === "pending"}
+                required
+              />
+            </label>
+            <button className="btn btn-primary demo-call-button" type="submit" disabled={demoCallState.state === "pending"}>
+              {demoCallState.state === "pending" ? "Calling…" : "Call me with the demo agent"}
+            </button>
+          </form>
+          <p className="field-hint demo-call-note">Only the fixed synthetic attendance value is sent to the voice agent. Demo calls are rate-limited.</p>
+          {demoCallState.message ? (
+            <div className={`demo-call-result ${demoCallState.state === "error" ? "error" : "success"}`} role={demoCallState.state === "error" ? "alert" : "status"}>
+              {demoCallState.message}
+            </div>
+          ) : null}
+        </div>
+      </Card>
 
       <Card padded={false}>
         <CardHeader

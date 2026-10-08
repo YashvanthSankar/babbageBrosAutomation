@@ -168,6 +168,14 @@ function Landing() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function prefillDemo(kind: "student" | "professor") {
+    setName(kind === "student" ? "Narendhar" : "Professor");
+    setEmail(kind === "student" ? "ec24b1053@iiitdm.ac.in" : "professor@iiitdm.ac.in");
+    setPhone(randomDemoPhone());
+    setPassword("meow");
+    setError(null);
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanEmail = email.trim().toLowerCase();
@@ -298,6 +306,30 @@ function Landing() {
                 </Alert>
               </div>
 
+              <div className="demo-prefill" aria-label="Demo account shortcuts">
+                <div className="demo-prefill-head">
+                  <div>
+                    <div className="card-title">Try a ready-made view</div>
+                    <p className="small muted">Fill the form instantly, then sign in.</p>
+                  </div>
+                  <span className="demo-prefill-arrow" aria-hidden>↘</span>
+                </div>
+                <div className="demo-prefill-grid">
+                  <button className="demo-role-card student" type="button" onClick={() => prefillDemo("student")} disabled={pending}>
+                    <span className="demo-role-kicker">Student demo</span>
+                    <strong>Narendhar</strong>
+                    <span>Attendance, marks &amp; recovery plan</span>
+                    <span className="demo-role-cta">Prefill student →</span>
+                  </button>
+                  <button className="demo-role-card professor" type="button" onClick={() => prefillDemo("professor")} disabled={pending}>
+                    <span className="demo-role-kicker">Professor demo</span>
+                    <strong>Professor</strong>
+                    <span>Risk dashboard, imports &amp; calls</span>
+                    <span className="demo-role-cta">Prefill professor →</span>
+                  </button>
+                </div>
+              </div>
+
               <form className="auth-form" onSubmit={handleSubmit} noValidate>
                 <div className="field">
                   <label className="field-label" htmlFor="demo-name">
@@ -422,6 +454,16 @@ function Landing() {
       </footer>
     </div>
   );
+}
+
+function randomDemoPhone(): string {
+  const randomDigit = (max: number) => {
+    if (typeof globalThis.crypto?.getRandomValues === "function") {
+      return globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % max;
+    }
+    return Math.floor(Math.random() * max);
+  };
+  return `+91${6 + randomDigit(4)}${Array.from({ length: 9 }, () => randomDigit(10)).join("")}`;
 }
 
 function credentialsErrorMessage(code: string): string {

@@ -108,6 +108,12 @@ Downloads the attendance `.xlsx` template.
 
 The query parameter is optional; the first subject by name is selected by default. Returns the subject list, selected subject, summary counts, class average, and sorted per-student risk rows. Returns a null summary and empty student list when no subject exists.
 
+## Voice demo
+
+### `POST /api/voice/demo-call`
+
+Professor-only. Accepts `{ "phone": "+919876543210" }` and dispatches the voice agent with a fixed synthetic attendance context of 69%. Numbers must be Indian E.164 mobile numbers. Calls are limited to one per number every 10 minutes and 12 calls per server hour.
+
 ## Important error codes
 
 | Code | HTTP status | Meaning |
