@@ -9,13 +9,14 @@
 | Try it | Link |
 |---|---|
 | **Live application** | [https://automation.zapdos.me](https://automation.zapdos.me) |
-| **Watch the demo (92 seconds)** | [Play or download the MP4 from this repository](media/student-success-demo.mp4) |
-| Earlier shared folder | [Google Drive demo folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
+| **Watch on Google Drive** | [Play the demo video](https://drive.google.com/file/d/19jopIIb_om1eBuyqnCYHLwsilI91GU4B/view?usp=sharing) |
+| **Direct MP4 file** | [Download the video from GitHub](https://raw.githubusercontent.com/YashvanthSankar/babbageBrosAutomation/main/media/student-success-demo.mp4) |
+| Other video links | [GitHub video page](https://github.com/YashvanthSankar/babbageBrosAutomation/blob/main/media/student-success-demo.mp4) · [Google Drive folder](https://drive.google.com/drive/folders/1YsY0S6E2oenZPANP0DBc4W1Xzsvun2lo?usp=sharing) |
 | Source | [GitHub repository](https://github.com/YashvanthSankar/babbageBrosAutomation) |
 
-[![Watch the Student Success demo video: records to risk to support](media/student-success-demo-poster.jpg)](media/student-success-demo.mp4)
+[![Watch the Student Success demo video: records to risk to support](media/student-success-demo-poster.jpg)](https://github.com/YashvanthSankar/babbageBrosAutomation/blob/main/media/student-success-demo.mp4)
 
-**[▶ Watch / download the demo video](media/student-success-demo.mp4)** · 1080p · 1 minute 32 seconds · narrated product tour. The public landing page is a real capture; authenticated dashboard screens show the real interface with **synthetic, intercepted data**, not a live student record or a completed provider send. Hosted weekly automation and Google Calendar remain unverified end to end. See [the verification audit](docs/progress/2026-10-09-integration-audit.md) for the current release boundary.
+**[▶ Play on Google Drive](https://drive.google.com/file/d/19jopIIb_om1eBuyqnCYHLwsilI91GU4B/view?usp=sharing)** · **[↓ Direct MP4 download](https://raw.githubusercontent.com/YashvanthSankar/babbageBrosAutomation/main/media/student-success-demo.mp4)**. This 1080p, 1-minute-32-second narrated tour uses a real capture of the public landing page and the real dashboard interface with **synthetic, intercepted data**—not live student records or a completed provider send. Hosted weekly execution and Google Calendar remain unverified end to end. See [the verification audit](docs/progress/2026-10-09-integration-audit.md).
 
 ## The problem we chose to solve
 
@@ -121,9 +122,11 @@ They are strong orchestration tools; they could trigger downstream notifications
 
 This is **not** “we replaced all connectors.” We implemented the domain-specific core as a product and kept external APIs at the edges. If an institute already has a trusted SIS and strong login, a workflow platform could be an excellent complementary orchestration layer. Our choice costs us more code, deployment work, monitoring, provider maintenance and security responsibility. The [decision record](docs/workflow-choice.md) separates fit from unsupported superiority claims.
 
+**The difference:** a connector can send a warning; the product must first establish whose record changed, whether the risk is real, whether an intervention has already been attempted, and whether the student has a safe next step.
+
 ## Evidence and release status (9 October 2026)
 
-**Implementation is not the same as hosted end-to-end verification.** On this checkout (`32a929e` before this documentation/testing change), 54 automated tests pass, including three new isolated tests executing the actual Convex handlers with a disposable in-memory database. TypeScript checking and the production build pass. A read-only hosted smoke check reaches the app and Convex, but the new weekly routes return **404**: the VPS app has not been updated to match the production Convex deployment. The smoke script deliberately never signs in, uploads data, sends mail or places calls. See [dated verification and release blockers](docs/progress/2026-10-09-integration-audit.md).
+**Implementation is not the same as hosted end-to-end verification.** At the [isolated integration audit](docs/progress/2026-10-09-integration-audit.md), 54 automated tests passed, including three tests executing actual Convex handlers with a disposable in-memory database; TypeScript checking and the production build also passed. At the latest read-only hosted smoke check (9 October 2026), the weekly manual route returned **401 without a session** instead of the earlier 404, so the route exists on the VPS. The cron route returned **503 without configuration**; authenticated weekly execution, an installed schedule, and provider delivery remain unverified. The smoke script never signs in, uploads data, sends mail or places calls.
 
 | Capability | Implementation / verification |
 |---|---|
@@ -133,8 +136,8 @@ This is **not** “we replaced all connectors.” We implemented the domain-spec
 | Appointment booking | Local Convex conflict and cross-professor checks passed in isolated tests. Google Calendar consent, availability and real event creation are **not verified end to end**. |
 | Voice | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned test number and fixed synthetic context. |
 | Email | Attendance/marks imports create deduplicated warning activity. A manual synthetic warning demo is limited to once per UTC day with a durable claim; public mode simulates. Explicitly enabled live tests go only to the server-pinned consenting inbox with fixed synthetic content. Live inbox receipt has not been verified. |
-| Weekly summary and adviser escalation | Implemented and tested locally; isolated Convex test verifies cohort counts and duplicate weekly claims. Both hosted POST routes currently return **404**. Scheduling requires `CRON_SECRET` and a monitored VPS cron entry; neither is proved installed. Adviser action requires a configured adviser email and at-risk students. Public mode simulates; optional live test delivery is pinned to a consenting test inbox. |
-| Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Home and health return 200; protected reads return 401 without a session; weekly routes still need VPS deployment. |
+| Weekly summary and adviser escalation | Implemented and tested locally; isolated Convex test verifies cohort counts and duplicate weekly claims. The hosted manual route now returns **401 without a session**, not 404; the cron route returns **503** because its required configuration is missing. Neither route has been verified with an authorized run. Scheduling requires `CRON_SECRET` and a monitored VPS cron entry; neither is proved installed. Adviser action requires a configured adviser email and at-risk students. Public mode simulates; optional live test delivery is pinned to a consenting test inbox. |
+| Public demo hosting | [https://automation.zapdos.me](https://automation.zapdos.me) · Home and health return 200; protected reads return 401 without a session. Route presence is not evidence that authenticated workflows succeed. |
 
 ## A judge’s two-minute walkthrough
 
@@ -143,7 +146,7 @@ This is **not** “we replaced all connectors.” We implemented the domain-spec
 3. Open the risk-ranked student list. Pick a student below threshold and inspect the attendance arithmetic, recovery count, and marks trend.
 4. Sign out and sign in with that roster-listed student’s institute email. Confirm that only their records appear.
 5. Book an appointment and show the result. If Google Calendar is not connected, describe it accurately as an in-app reservation—not a Google event.
-6. **After the VPS is updated**, open Automations, run the weekly summary, repeat it to demonstrate `already_run`, and inspect aggregate counts. Until then the hosted weekly endpoint is 404. Public mode marks events simulated; a provider-accepted pinned test does not prove an email was read or a call answered.
+6. After checking the VPS configuration with synthetic data, open Automations, run the weekly summary, repeat it to inspect the `already_run` result, and verify aggregate counts. The hosted route exists but **this authenticated path has not been checked**. Public mode marks events simulated; a provider-accepted pinned test does not prove an email was read or a call answered.
 
 **Demo security:** sign-in accepts any non-empty password and does not verify identity. Anyone can impersonate the configured professor or a student account. This is not production authentication or a secure store for real records. Use synthetic student names, emails, phone numbers, attendance, and marks only. Rotate the previously exposed Google OAuth client secret before real use; don't put replacement secrets in issues, chat, or Git. Dependency audit and production authentication hardening remain release work.
 
@@ -193,10 +196,10 @@ Provider secrets belong only in the server environment and must never be committ
 npm test
 npm run typecheck
 npm run build
-npm run smoke:hosted # read-only check; exits nonzero while weekly routes are missing
+npm run smoke:hosted # read-only anonymous checks; passing does not verify integration delivery
 ```
 
-The isolated Convex tests use `convex-test`: useful for business logic, but not a real Convex deployment, server session, provider inbox or Google consent test. The smoke script makes no authenticated requests and does not dispatch providers. For HTTPS, deployment and provider configuration, follow [deploy/README.md](deploy/README.md); production Convex functions and VPS Next.js releases are separate. To finish hosted verification: deploy the matching VPS revision, rerun smoke, sign in with synthetic identities, exercise roster → attendance → marks → risk → student view → booking in a controlled demo environment, manually run and replay the weekly summary, and verify cron and OAuth only after explicitly configuring them. Do not enable live providers without consenting, pinned recipients.
+The isolated Convex tests use `convex-test`: useful for business logic, but not a real Convex deployment, server session, provider inbox or Google consent test. The smoke script makes no authenticated requests and does not dispatch providers. For HTTPS, deployment and provider configuration, follow [deploy/README.md](deploy/README.md); production Convex functions and VPS Next.js releases are separate. To finish hosted verification: confirm the running VPS revision and environment, sign in with synthetic identities, exercise roster → attendance → marks → risk → student view → booking in a controlled demo environment, manually run and replay the weekly summary, and verify cron and OAuth only after explicitly configuring them. Do not enable live providers without consenting, pinned recipients.
 
 ---
 

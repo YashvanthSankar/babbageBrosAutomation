@@ -20,3 +20,7 @@
 Dashboard risk projections and Convex automation/cohort queries independently calculate risk from the same stored records. The tested synthetic scenarios agree, but exhaustive parity across corrections, ties and boundary thresholds is not yet established; add differential regression cases before claiming exact equivalence.
 
 See [the README](../../README.md) for the architectural case and a current capability/evidence table, [the earlier email implementation note](2026-10-09-email-and-weekly.md) for prior work, and [deployment instructions](../../deploy/README.md) for VPS configuration.
+
+## Follow-up — 2026-10-09, after the original audit
+
+Re-ran the anonymous `npm run smoke:hosted` against the public VPS. All checks passed: the manual weekly POST now returns **401 without a session** (previously 404); the cron POST returns **503** because `CRON_SECRET` or `PROFESSOR_EMAIL` is not configured. Home, health and providers return 200; protected reads and the manual email POST return 401 without a session. This confirms route presence, **not** a matching deployed commit, an authorized weekly run, a scheduled job, or actual provider delivery. Keep release gates 2–6 above open. Gate 1's previously missing-route symptom is resolved, but verify the exact running revision before marking its deployment requirement complete.
