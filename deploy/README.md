@@ -15,7 +15,12 @@ Convex production is `https://groovy-sheep-854.convex.cloud` in Denoise Labs's
    results, then verify student access and appointments.
 
 Calendar OAuth requires a web client with redirect URI
-`https://YOUR_DOMAIN/api/auth/callback/google-professor` and professor consent.
+`https://YOUR_DOMAIN/api/auth/callback/google-professor`. Set
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_CALENDAR_ACCOUNT` to the
+exact email of a dedicated demo Google account; the professor must authorize
+that account from the admin dashboard. Add the account as an OAuth test user if
+the consent screen is in Testing. The connection page shows which account is
+configured. Do not connect a personal primary calendar for the public demo.
 Public provider automation defaults to simulation. For a controlled live test, set `DEMO_LIVE_AUTOMATIONS=true`, configure provider credentials, and pin consenting `DEMO_AUTOMATION_EMAIL` and/or `DEMO_AUTOMATION_PHONE` destinations. Resend also requires a verified sender. Live test messages and calls use fixed synthetic content and never use uploaded student addresses, phone numbers, or academic details; each provider is capped at one live dispatch per UTC day. Provider acceptance does not prove an email was read or a call was answered. Weekly summaries are not implemented.
 Never store environment secrets or uploaded student files in Git.
 

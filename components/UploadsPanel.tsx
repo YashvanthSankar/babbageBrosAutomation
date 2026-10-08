@@ -46,7 +46,7 @@ const STEPS: {
     title: "Marks",
     endpoint: "/api/ingest/marks",
     needsSubject: true,
-    description: "Import test scores. A subject can be selected here or supplied in the CSV.",
+    description: "Import test scores from CSV or Excel. Excel sheets need test details below.",
     columns: "rollno, subject, test_name, test_date, score, max_score",
     hint: "Scores are compared as percentages against the previous comparable test.",
   },
@@ -77,6 +77,9 @@ export default function UploadsPanel({
     attendance: { status: "idle" },
     marks: { status: "idle" },
   });
+  const [assessmentName, setAssessmentName] = useState("");
+  const [assessmentDate, setAssessmentDate] = useState("");
+  const [maxMarks, setMaxMarks] = useState("");
 
   const step = STEPS.find((s) => s.id === active)!;
   const rosterDone = results.roster.status === "done" || studentsCount > 0;
@@ -98,6 +101,12 @@ export default function UploadsPanel({
       }));
       return;
     }
+    if (current === "marks" && file.name.toLowerCase().endsWith(".xlsx") &&
+        (assessmentName.trim().length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(assessmentDate) ||
+          !Number.isFinite(Number(maxMarks)) || Number(maxMarks) <= 0)) {
+      setResults((prev) => ({ ...prev, marks: { status: "error", error: "For Excel marks, enter a test name, date, and positive maximum marks." } }));
+      return;
+    }
 
     setResults((prev) => ({ ...prev, [current]: { status: "uploading" } }));
 
@@ -105,6 +114,11 @@ export default function UploadsPanel({
     form.append("file", file);
     if (config.needsSubject) {
       form.append("subjectId", subjectChoice[current]);
+    }
+    if (current === "marks" && file.name.toLowerCase().endsWith(".xlsx")) {
+      form.append("assessmentName", assessmentName.trim());
+      form.append("assessmentDate", assessmentDate);
+      form.append("maxMarks", maxMarks);
     }
 
     const res = await apiUpload<IngestResult>(config.endpoint, form);
@@ -225,6 +239,15 @@ export default function UploadsPanel({
               </div>
             )}
           </div>
+
+          {active === "marks" && files.marks?.name.toLowerCase().endsWith(".xlsx") ? (
+            <div className="form-grid">
+              <label className="field"><span className="field-label">Test name</span><input className="input" value={assessmentName} onChange={(event) => setAssessmentName(event.target.value)} placeholder="Quiz 1" required /></label>
+              <label className="field"><span className="field-label">Test date</span><input className="input" type="date" value={assessmentDate} onChange={(event) => setAssessmentDate(event.target.value)} required /></label>
+              <label className="field"><span className="field-label">Maximum marks</span><input className="input" type="number" min="0.01" step="any" value={maxMarks} onChange={(event) => setMaxMarks(event.target.value)} placeholder="100" required /></label>
+              <p className="field-hint">Excel columns: roll_number, marks_obtained. The same test details apply to every row.</p>
+            </div>
+          ) : null}
 
           {step.needsSubject ? (
             <div className="field">

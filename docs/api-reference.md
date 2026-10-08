@@ -68,6 +68,10 @@ Downloads the corresponding import template.
 
 ## Appointments and Google Calendar
 
+### `GET /api/calendar/connection`
+
+Professor-only setup status: reports the app professor email, the configured dedicated Google account email, whether OAuth is configured, and whether the professor has connected it. It never returns credentials or tokens.
+
 ### `GET /api/calendar/slots?subjectId=...&date=YYYY-MM-DD`
 
 Returns candidate slots as ISO timestamps and indicates whether availability came from Google Calendar or in-app reservations. If the professor has not connected Google Calendar, the response explains that availability is local only.

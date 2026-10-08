@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { apiGet, apiPostJson } from "./api";
 import type { AdminDashboard as AdminData, Student, SubjectStat } from "./types";
 import { attendancePercent, formatPercent, initials, studentRiskBadge, subjectLabel, summarize, uniqueSubjects } from "./helpers";
@@ -9,6 +9,7 @@ import { Alert, Badge, Card, CardHeader, EmptyState, Progress } from "./ui";
 import Icon from "./Icon";
 import UploadsPanel from "./UploadsPanel";
 import AutomationCenter from "./AutomationCenter";
+import CalendarConnect from "./CalendarConnect";
 
 type Tab = "students" | "imports" | "automation";
 const navigation = [
@@ -23,7 +24,6 @@ function levelFor(subjects: SubjectStat[]): string {
 }
 
 export default function AdminDashboard({ data, onChanged }: { data: AdminData; onChanged: () => void }) {
-  const { data: session } = useSession();
   const [tab, setTab] = useState<Tab>("students");
   const [page, setPage] = useState(1);
   const pageSize = 8;
@@ -84,7 +84,7 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
       <div className="sidebar-bottom"><span className="avatar avatar-fallback">{initials(data.professor?.name || "Professor")}</span><div><strong>{data.professor?.name || "Professor"}</strong><span>Faculty workspace</span></div><button type="button" className="sidebar-signout" aria-label="Sign out" onClick={() => signOut()}><Icon name="logout" size={18} /></button></div>
     </aside>
     <div className="workspace-content">
-      <div className="workspace-topbar"><div className="workspace-breadcrumb">Workspace <Icon name="chevron" size={14} /> {navigation.find(item => item.id === tab)?.label}</div><div className="workspace-topbar-right"><span className="demo-access-label">Competition demo</span><span>{session?.user.hasCalendar ? "Calendar connected" : "In-app booking"}</span>{!session?.user.hasCalendar ? <button type="button" className="btn btn-sm" onClick={() => void signIn("google-professor")}>Connect Calendar</button> : null}<span>{data.professor?.email}</span></div></div>
+      <div className="workspace-topbar"><div className="workspace-breadcrumb">Workspace <Icon name="chevron" size={14} /> {navigation.find(item => item.id === tab)?.label}</div><div className="workspace-topbar-right"><span className="demo-access-label">Competition demo</span><CalendarConnect professorEmail={data.professor?.email ?? ""} /><span>{data.professor?.email}</span></div></div>
       <header className="overview-header"><div><h1>{title}</h1><p>{subtitle}</p></div><div className="overview-actions"><button type="button" className="btn icon-button" aria-label="Refresh dashboard" onClick={onChanged}><Icon name="refresh" /></button>{tab === "students" ? <button type="button" className="btn btn-primary" onClick={() => setTab("imports")}><Icon name="upload" size={17} />Import records</button> : null}</div></header>
 
       {tab === "students" ? <>

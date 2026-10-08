@@ -65,7 +65,7 @@ export const authOptions: NextAuthOptions = {
         return student ? { id: String(student.id), email, name: student.name } : null;
       },
     }),
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [GoogleProvider({
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_CALENDAR_ACCOUNT ? [GoogleProvider({
       id:'google-professor',name:'Connect professor Google Calendar',
       clientId:process.env.GOOGLE_CLIENT_ID,clientSecret:process.env.GOOGLE_CLIENT_SECRET,
       authorization:{params:{scope:'openid email profile https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events',access_type:'offline',prompt:'consent'}},
@@ -73,11 +73,19 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      if(account?.provider==='google-professor') return isProfessorEmail(user.email) && (profile as {email_verified?:boolean})?.email_verified===true;
+      if(account?.provider==='google-professor') {
+        const verified = (profile as { email_verified?: unknown } | undefined)?.email_verified;
+        return normalizeEmail(user.email ?? '') === normalizeEmail(process.env.GOOGLE_CALENDAR_ACCOUNT ?? '') && (verified === true || verified === 'true');
+      }
       return account?.provider === DEMO_CREDENTIALS_PROVIDER_ID && isStudentDomainEmail(user.email);
     },
     async jwt({ token,account }) {
-      const email = normalizeEmail(token.email ?? '');
+      // OAuth verifies the dedicated Calendar account, then returns to the
+      // professor's application identity instead of replacing it with Gmail.
+      const email = account?.provider === 'google-professor'
+        ? getProfessorEmail()
+        : normalizeEmail(token.email ?? '');
+      token.email = email;
       token.role = isProfessorEmail(email) ? 'admin' : 'student';
       token.studentId = token.role === 'student' ? (await findStudentByEmail(email))?.id ?? null : null;
       if(token.role==='admin') {

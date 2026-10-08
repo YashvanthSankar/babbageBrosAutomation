@@ -4,7 +4,7 @@
 
 ## Provider connection contract
 
-Credentials sign-in remains available. Optional professor-only Google OAuth uses provider `google-professor` and callback `/api/auth/callback/google-professor`; set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and stable token encryption secret. The exact configured professor must consent. Connected slots merge Google FreeBusy and local reservations; unconnected slots explicitly use in-app availability. Connected bookings create Google events.
+Credentials sign-in remains available. Optional professor-only Google OAuth uses provider `google-professor` and callback `/api/auth/callback/google-professor`; set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_CALENDAR_ACCOUNT` to an explicitly approved dedicated demo Google account. That account must consent; its OAuth identity is mapped to the configured application professor, and its encrypted refresh token is stored under the professor identity. Connected slots merge that account's primary Calendar FreeBusy with local reservations; connected bookings create Calendar events. Unconnected slots explicitly use in-app availability. A Google API key alone cannot authorize private Calendar access.
 
 Import confirmation triggers provider automation after durable commit; dashboard reads are side-effect free. Public mode simulates email and voice events by default. Live tests require explicit `DEMO_LIVE_AUTOMATIONS=true`, provider configuration, and a server-pinned consenting test inbox/number. Live messages use fixed synthetic content and never disclose uploaded student contacts or academic details. Daily idempotency claims cap each provider to one live send per UTC day. Weekly summaries are not implemented.
 

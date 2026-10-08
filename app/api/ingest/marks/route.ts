@@ -2,17 +2,17 @@
  * POST /api/ingest/marks
  *
  * One-shot marks import used by the professor dashboard's Imports tab.
- * Accepts multipart/form-data with `file` (.csv or .xlsx) and an optional
- * `subjectId`; when absent, each row's `subject` column is matched against the
- * professor's subject code or name. Valid scores are upserted into
- * `test_results`, so a re-upload corrects the previous value.
+ * Accepts multipart/form-data with a CSV file and optional subjectId, or an
+ * Excel file with subjectId, assessmentName, assessmentDate, and maxMarks.
+ * Valid scores are upserted into Convex marks records.
  */
 import type { NextResponse } from 'next/server';
 import { ApiError, handleRoute, json } from '@/lib/api';
 import { getSession, requireAdmin, sessionEmail } from '@/lib/session';
 import { isUploadValidationError, readUploadFile, toRowErrors } from '@/lib/imports/http';
 import { parseMarksCsv } from '@/lib/imports/csv';
-import { applyMarks, requireSubject } from '@/lib/imports/service';
+import { parseMarksWorkbook } from '@/lib/imports/parser';
+import { applyMarks, listKnownStudents, requireSubject } from '@/lib/imports/service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,11 +45,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       throw error;
     }
 
-    if (file.kind !== 'csv') {
-      throw new ApiError(422, 'INVALID_WORKBOOK', 'Marks import currently accepts .csv files only.');
+    let result;
+    if (file.kind === 'xlsx') {
+      if (!subjectId) throw new ApiError(422, 'VALIDATION_ERROR', 'Choose a subject for an Excel marks sheet.');
+      const assessmentName = String(form.get('assessmentName') ?? '').trim();
+      const assessmentDate = String(form.get('assessmentDate') ?? '').trim();
+      const maxMarks = Number(form.get('maxMarks'));
+      if (assessmentName.length < 2 || !/^\d{4}-\d{2}-\d{2}$/.test(assessmentDate) ||
+          Number.isNaN(Date.parse(assessmentDate)) ||
+          new Date(assessmentDate).toISOString().slice(0, 10) !== assessmentDate ||
+          !Number.isFinite(maxMarks) || maxMarks <= 0) {
+        throw new ApiError(422, 'VALIDATION_ERROR', 'Enter a test name, valid date, and positive maximum marks for the Excel sheet.');
+      }
+      result = await parseMarksWorkbook(file.buffer, { subjectId, assessmentName, assessmentDate, maxMarks }, await listKnownStudents(professorEmail));
+    } else {
+      result = parseMarksCsv(file.buffer.toString('utf8'), subjectId);
     }
-
-    const result = parseMarksCsv(file.buffer.toString('utf8'), subjectId);
     if (result.report.errors.length) return json({ imported: 0, updated: 0, errors: toRowErrors(result.report.errors) });
     const applied = await applyMarks(professorEmail, subjectId, result.payload.entries);
     return json({

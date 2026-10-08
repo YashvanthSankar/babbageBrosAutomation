@@ -6,7 +6,7 @@ Read [architecture.md](architecture.md) for the shared implementation contract. 
 
 Gokul's latest upload commit 4f0e175 is merged with the professor/student dashboard and NextAuth session. Convex is the shared production database; the app and email/voice/calendar automation run from the VPS. PostgreSQL files are historical reference, not the live database.
 
-The workbook parser supports roster, attendance and marks previews. Confirmation applies an entire batch atomically, once, with a 30-minute expiry. Dashboard CSV uploads use the same Convex import mutations. Re-imports update existing attendance and test records.
+The workbook parser supports roster, attendance and marks previews. Confirmation applies an entire batch atomically, once, with a 30-minute expiry. Dashboard imports accept CSV, and Excel for roster, attendance and marks; Excel marks need assessment metadata. Re-imports update existing attendance and test records.
 
 ## Deployment
 

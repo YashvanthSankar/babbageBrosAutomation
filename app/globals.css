@@ -1631,3 +1631,13 @@ table.data tbody tr:last-child td {
 @media(max-width:1000px) { .welcome-main { gap:40px; grid-template-columns:minmax(0,1fr) minmax(340px,.9fr); } .welcome-header,.welcome-main,.welcome-footer { padding-left:30px; padding-right:30px; } .welcome-features { gap:14px; } }
 @media(max-width:760px) { .welcome-header { height:80px; } .welcome-main { grid-template-columns:1fr; padding-top:40px; gap:36px; } .welcome-story h1 { font-size:46px; } .welcome-signin { max-width:510px; width:100%; } .welcome-event span { display:none; } .welcome-features { margin-top:25px; } }
 @media(max-width:440px) { .welcome-header,.welcome-main,.welcome-footer { padding-left:20px; padding-right:20px; } .welcome-story h1 { font-size:38px; letter-spacing:-1.5px; } .welcome-brand { font-size:16px; } .welcome-event { font-size:11px; } .welcome-signin { padding:22px; } .welcome-features { grid-template-columns:1fr; gap:16px; } .welcome-features > div { display:grid; grid-template-columns:22px 1fr; column-gap:10px; } .welcome-features svg { grid-row:1 / 3; } .welcome-features p { margin:4px 0 0; } .welcome-preview-body { grid-template-columns:1fr 1.4fr; gap:15px; } .welcome-recovery { padding-left:16px; } .welcome-recovery strong { font-size:19px; } .welcome-footer { flex-direction:column; gap:8px; } }
+.calendar-connection-status { display:inline-flex; align-items:center; gap:6px; color:#64756c; font-size:12px; }
+.calendar-dialog-backdrop { position:fixed; inset:0; z-index:100; background:rgba(26,36,43,.42); display:grid; place-items:center; padding:20px; }
+.calendar-dialog { width:min(100%,480px); background:#fff; border-radius:12px; border:1px solid #e1e6e9; box-shadow:0 20px 70px rgba(26,36,43,.15); padding:32px; position:relative; color:#24313a; }
+.calendar-dialog-icon { width:44px; height:44px; display:grid; place-items:center; border-radius:10px; background:#f3f6f5; color:#61796a; }
+.calendar-dialog h2 { font-size:24px; letter-spacing:-.5px; margin:20px 0 12px; }
+.calendar-dialog p { font-size:14px; line-height:1.6; color:#5e6971; margin:0 0 12px; }
+.calendar-dialog p strong { color:#24313a; overflow-wrap:anywhere; }
+.calendar-dialog .btn { margin-top:12px; min-height:44px; }
+.calendar-dialog-close { position:absolute; right:18px; top:16px; background:transparent; border:0; font-size:24px; line-height:1; color:#737d85; cursor:pointer; width:34px; height:34px; }
+.calendar-setup-note { background:#f7f8f9; border:1px solid #e3e8eb; border-radius:7px; padding:14px; color:#52616b; font-size:13px; line-height:1.6; margin-top:18px; }

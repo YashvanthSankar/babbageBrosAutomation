@@ -28,7 +28,7 @@ The goal is not to replace a professor’s judgment. It is to make important sig
 
 - Create a subject and set attendance and marks thresholds.
 - Import the roster first, then attendance and marks. Dashboard imports return row-level validation errors before applying records; the server also exposes staged preview/confirm APIs.
-- Upload CSV for each record type; roster and attendance also accept Excel. The dashboard marks uploader is CSV-only.
+- Upload CSV for each record type; roster, attendance, and marks also accept Excel. Excel marks require a test name, date, and maximum score.
 - See students ordered by risk, with attendance, recovery classes, latest marks, and score movement together.
 - Review deduplicated post-import email/call activity; public mode is simulated, while optional live tests are pinned to consenting test contacts.
 
@@ -83,10 +83,10 @@ We want the demo to be credible, so we distinguish working application behavior 
 
 | Capability | Implementation / verification |
 |---|---|
-| Roster, attendance, and marks imports | Dashboard CSV imports are implemented (roster/attendance also accept Excel; marks dashboard upload is CSV-only). Validation, atomic writes, templates, repeat-import handling, and separate staged preview/confirm APIs are available. |
+| Roster, attendance, and marks imports | Dashboard CSV imports are implemented; the dashboard also accepts Excel for all three types, with test metadata required for Excel marks. Validation, atomic writes, templates, repeat-import handling, and separate staged preview/confirm APIs are available. |
 | Attendance and marks risk | Deterministic threshold, recovery-class, weak-mark, and falling-mark calculations are implemented and covered by tests. |
 | Professor/student dashboards | Implemented with server-side role and student-record scoping. |
-| Appointment booking | In-app reservations and collision rejection were tested. Google Calendar synchronization is optional and requires professor OAuth consent; do not assume it is connected in a demo. |
+| Appointment booking | In-app reservations and collision rejection were tested. Google Calendar synchronization is optional and requires a configured dedicated demo Google account, web OAuth credentials, and that account's consent; do not assume it is connected in a demo. |
 | Voice | A newly-below-threshold attendance transition creates a deduplicated event. Public mode simulates; explicitly enabled live tests use only the server-pinned test number and fixed synthetic context. |
 | Email | Attendance/marks imports create deduplicated warning activity. Public mode simulates; explicitly enabled live tests go only to the server-pinned test inbox with generic synthetic content. Live inbox receipt is not yet verified. |
 | Weekly summary | Not implemented in this competition version. |
