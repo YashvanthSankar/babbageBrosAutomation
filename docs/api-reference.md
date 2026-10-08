@@ -119,4 +119,4 @@ The query parameter is optional; the first subject by name is selected by defaul
 | `SUBJECT_NOT_FOUND` | 404 | Subject is absent or belongs to another teacher |
 | `BATCH_HAS_ERRORS` | 409 | Preview contains blocking errors |
 | `BATCH_UNAVAILABLE` | 409 | Batch expired, was already claimed, or is not teacher-owned |
-| `DATABASE_UNAVAILABLE` | 503 | Health check could not reach PostgreSQL |
+| `DATASTORE_UNAVAILABLE` | 503 | Health check could not reach Convex |

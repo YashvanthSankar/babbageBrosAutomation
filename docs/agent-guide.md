@@ -8,10 +8,10 @@ The current deliverable is a backend-first MVP. Do not build a frontend unless t
 
 ## Sources of truth
 
-- Database schema and uniqueness: `lib/db/schema.ts`.
+- Convex schema and indexes: `convex/schema.ts` once created.
 - Workbook formats and cell validation: `lib/imports/parser.ts`.
 - Staged import creation: `lib/imports/http.ts`.
-- Atomic confirmation and upsert behavior: `app/api/imports/[batchId]/confirm/route.ts`.
+- Atomic confirmation and upsert behavior: the Convex confirmation mutation once created.
 - Risk formulas and ordering: `lib/risk.ts`.
 - JSON input rules: `lib/validation.ts`.
 - External API contract: `docs/api-reference.md`.
@@ -24,7 +24,7 @@ When code and documentation disagree, treat it as a defect. Determine intended b
 2. Scope every teacher-owned lookup and mutation by that teacher ID.
 3. Preview may write only an `import_batches` staging record; it must not change students or attendance.
 4. A batch with errors cannot be confirmed.
-5. Confirmation must claim and apply a batch in one transaction. A batch is single-use and expires after 30 minutes.
+5. Confirmation must claim and apply a batch in one atomic Convex mutation. A batch is single-use and expires after 30 minutes.
 6. Attendance uniqueness is student + subject + date. Re-imports update rather than duplicate.
 7. Blank attendance is unrecorded, not absent.
 8. Do not silently accept aliases or change workbook headers, status values, thresholds, watch-band width, formulas, or import limits. Update tests and docs with any approved contract change.
@@ -43,31 +43,33 @@ After material work:
 
 - Run `npm test`.
 - Run `npm run build`.
-- If the schema changed, run `npm run db:generate` and inspect the SQL migration.
+- If the schema changed, run Convex code generation and inspect the generated types.
 - Update every affected document, including API examples and environment variables.
 - Update the implementation-status checklist below.
 
 ## Implementation status
 
-- [x] Drizzle/PostgreSQL schema and migration source.
-- [x] Signed one-click demo session.
-- [x] Teacher-scoped student CRUD.
-- [x] Teacher-scoped subject CRUD.
-- [x] Roster `.xlsx` template, parser, preview, and confirmation.
-- [x] Attendance `.xlsx` template, parser, preview, and correction-safe confirmation.
-- [x] Risk calculation and sorted dashboard-data API.
-- [x] Health endpoint.
+- [ ] Convex schema, indexes, and generated API.
+- [ ] Signed one-click demo session backed by Convex.
+- [ ] Teacher-scoped student CRUD backed by Convex.
+- [ ] Teacher-scoped subject CRUD backed by Convex.
+- [x] Roster `.xlsx` template, parser, and validation contract.
+- [x] Attendance `.xlsx` template, parser, and validation contract.
+- [ ] Convex staging and atomic confirmation for both import types.
+- [x] Risk calculation and ordering logic.
+- [ ] Convex-backed dashboard-data and health endpoints.
 - [x] Parser and risk unit tests.
-- [ ] Verification against the collaborator-provided PostgreSQL database.
+- [ ] Verification against the team Convex deployment.
 - [ ] Hosted deployment and live smoke test.
 - [ ] Teacher-facing frontend, currently out of scope.
 
 ## Known limitations and next priorities
 
-1. Connect the supplied PostgreSQL database, migrate it, seed the demo teacher, and perform the documented API smoke test.
-2. Add database integration tests using an isolated PostgreSQL database, including atomic rollback, single-use confirmation, correction upserts, and cross-teacher access.
-3. Deploy to the selected host and verify upload limits under that provider.
-4. Only after an explicit scope change, build a client against `docs/api-reference.md`.
+1. Replace the current persistence adapter with `convex/schema.ts` plus teacher, student, subject, import, attendance, dashboard, and health functions.
+2. Add Convex integration tests covering atomic failure, single-use confirmation, correction upserts, and cross-teacher access.
+3. Connect the team Convex deployment and perform the documented API smoke test.
+4. Deploy to the selected host and verify upload limits under that provider.
+5. Only after an explicit scope change, build a client against `docs/api-reference.md`.
 
 ## Definition of done
 

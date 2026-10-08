@@ -4,15 +4,16 @@
 
 - Node.js 20 or newer.
 - npm.
-- PostgreSQL 14 or newer, reachable through a URL.
+- A Convex account and development deployment.
 
 ## Environment
 
-Copy `.env.example` to `.env.local` for Next.js. Drizzle CLI commands read process environment variables, so load `DATABASE_URL` into the shell or use an environment loader supported by your host.
+Convex setup produces the deployment configuration used by its CLI and client. Keep deployment identifiers and URLs in local or host-managed environment variables.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | PostgreSQL connection URL |
+| `CONVEX_DEPLOYMENT` | Yes for development | Convex development deployment identifier |
+| `NEXT_PUBLIC_CONVEX_URL` | Yes | Convex deployment URL |
 | `SESSION_SECRET` | Production | Long random key for demo-session signing |
 | `DEMO_TEACHER_EMAIL` | No | Defaults to `demo@attendly.local` |
 | `DEMO_TEACHER_NAME` | No | Defaults to `Demo Faculty` |
@@ -22,10 +23,11 @@ Never commit `.env.local`, credentials, real roster files, or attendance files.
 
 ## Commands
 
+The intended development flow after the Convex migration is completed is:
+
 ```powershell
 npm install
-npm run db:migrate
-npm run db:seed
+npx convex dev
 npm run dev
 ```
 
@@ -33,11 +35,8 @@ Other commands:
 
 - `npm test` — parser and risk tests.
 - `npm run build` — production compilation.
-- `npm run db:generate` — create a migration after schema changes.
-- `npm run db:push` — synchronize a disposable development database without migration history.
-- `npm run db:studio` — inspect the configured database.
-
-Use `db:migrate` for shared and hosted environments. Use `db:push` only for disposable development databases.
+- `npx convex dev` — synchronize the Convex schema/functions and generate API types.
+- `npx convex dashboard` — open the deployment dashboard.
 
 ## Verification
 
@@ -52,6 +51,6 @@ Use `db:migrate` for shared and hosted environments. Use `db:push` only for disp
 
 ## Deployment
 
-The app requires a Node.js runtime because ExcelJS and PostgreSQL are not configured for Edge execution. It is suitable for Vercel or a conventional Node host such as Render. Configure environment variables, run migrations against the hosted database, deploy, and verify `/api/health`. Provider selection is intentionally deferred.
+The Next.js upload handlers require a Node.js runtime because ExcelJS is not configured for Edge execution. Convex functions deploy separately through the Convex CLI. Configure both Convex variables and `SESSION_SECRET` on the selected Next.js host, deploy the Convex functions, deploy the app, and verify `/api/health`.
 
-Serverless PostgreSQL providers should supply a pooler-compatible URL. The driver uses `prepare: false` and a small connection count to work with transaction poolers.
+Do not follow the runtime commands above until `convex/schema.ts`, the required Convex functions, and the Convex package scripts have been added. That migration is the next blocking implementation task.
