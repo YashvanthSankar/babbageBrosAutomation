@@ -19,13 +19,7 @@ const navigation = [
 ];
 const riskRank: Record<string, number> = { high: 0, warn: 1, ok: 2, unknown: 3 };
 
-type DemoEmailResponse = {
-  email?: {
-    dispatched?: boolean;
-    simulated?: boolean;
-    attendancePercentage?: number;
-  };
-};
+type DemoResponse = { email?: { simulated?: boolean }; call?: { simulated?: boolean } };
 
 function levelFor(subjects: SubjectStat[]): string {
   return subjects.reduce((worst, subject) => (riskRank[subject.riskLevel ?? "unknown"] < riskRank[worst] ? subject.riskLevel ?? "unknown" : worst), "unknown");
@@ -79,8 +73,8 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const visibleStudents = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const title = tab === "students" ? "Overview" : tab === "imports" ? "Bring your records together" : "Your support workflows";
-  const subtitle = tab === "students" ? "A clear view of who needs support, and what to do next." : tab === "imports" ? "Start with your roster, then add attendance and assessment results." : "Track warning emails, provider readiness and appointment availability.";
+  const title = tab === "students" ? "Overview" : tab === "imports" ? "Import records" : "Emails, calls and appointments";
+  const subtitle = tab === "students" ? "Who needs support, and why." : tab === "imports" ? "Start with your roster, then add attendance and assessment results." : "Try a safe example or check what happened after an import.";
 
   return <div className="workspace">
     <aside className="workspace-sidebar">
@@ -92,7 +86,7 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
       <div className="sidebar-bottom"><span className="avatar avatar-fallback">{initials(data.professor?.name || "Professor")}</span><div><strong>{data.professor?.name || "Professor"}</strong><span>Faculty workspace</span></div><button type="button" className="sidebar-signout" aria-label="Sign out" onClick={() => signOut()}><Icon name="logout" size={18} /></button></div>
     </aside>
     <div className="workspace-content">
-      <div className="workspace-topbar"><div className="workspace-breadcrumb">Workspace <Icon name="chevron" size={14} /> {navigation.find(item => item.id === tab)?.label}</div><div className="workspace-topbar-right"><span className="demo-access-label">Competition demo</span><CalendarConnect professorEmail={data.professor?.email ?? ""} /><span>{data.professor?.email}</span></div></div>
+      <div className="workspace-topbar"><div className="workspace-breadcrumb">Workspace <Icon name="chevron" size={14} /> {navigation.find(item => item.id === tab)?.label}</div><div className="workspace-topbar-right"><span className="demo-access-label">Competition demo</span><CalendarConnect professorEmail={data.professor?.email ?? ""} /><span>{data.professor?.email}</span><button type="button" className="btn btn-sm workspace-mobile-signout" onClick={() => signOut()}>Sign out</button></div></div>
       <header className="overview-header"><div><h1>{title}</h1><p>{subtitle}</p></div><div className="overview-actions"><button type="button" className="btn icon-button" aria-label="Refresh dashboard" onClick={onChanged}><Icon name="refresh" /></button>{tab === "students" ? <button type="button" className="btn btn-primary" onClick={() => setTab("imports")}><Icon name="upload" size={17} />Import records</button> : null}</div></header>
 
       {tab === "students" ? <>
@@ -111,43 +105,47 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
           </Card>
         </div>
         {departments.length ? <div className="department-strip"><span>Departments</span>{departments.map(name => { const atRisk = students.filter(student => (student.subjects ?? []).some(subject => subject.department === name && subject.riskLevel === "high")).length; return <button type="button" key={name} className={departmentFilter === name ? "selected" : ""} aria-pressed={departmentFilter === name} onClick={() => setDepartmentFilter(departmentFilter === name ? "all" : name)}>{name}<span>{atRisk} at risk</span></button>; })}</div> : null}
-        <Card padded={false} className="student-directory"><CardHeader title="Students" subtitle="Prioritized by risk. Select a student to see their recovery plan." actions={<span className="directory-count">{filtered.length} {filtered.length === 1 ? "student" : "students"}</span>} />
+        <Card padded={false} className="student-directory"><CardHeader title="Students" subtitle="Prioritized by risk. Select a student to see their subject details." actions={<span className="directory-count">{filtered.length} {filtered.length === 1 ? "student" : "students"}</span>} />
           <div className="directory-toolbar"><label className="directory-search"><Icon name="search" size={18} /><input aria-label="Search students" placeholder="Search name, roll number or email…" value={query} onChange={event => setQuery(event.target.value)} /></label><select className="input" aria-label="Filter by subject" value={subjectFilter} onChange={event => setSubjectFilter(event.target.value)}><option value="all">All subjects</option>{subjects.map(subject => <option key={String(subject.id)} value={String(subject.id)}>{subjectLabel(subject)}</option>)}</select><select className="input" aria-label="Filter by department" value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}><option value="all">All departments</option>{departments.map(name => <option key={name} value={name}>{name}</option>)}</select><select className="input" aria-label="Filter by risk" value={riskFilter} onChange={event => setRiskFilter(event.target.value)}><option value="all">All risk levels</option><option value="high">At risk</option><option value="warn">Watch</option><option value="ok">On track</option><option value="unknown">No data</option></select>{query || subjectFilter !== "all" || departmentFilter !== "all" || riskFilter !== "all" ? <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setQuery(""); setSubjectFilter("all"); setDepartmentFilter("all"); setRiskFilter("all"); }}>Reset</button> : null}</div>
-          {filtered.length ? <div className="table-wrap"><table className="data directory-table"><thead><tr><th>Student</th><th>Attendance</th><th>Recent marks</th><th>Recovery plan</th><th>Status</th><th><span className="sr-only">View details</span></th></tr></thead><tbody>{visibleStudents.map(student => <StudentRow key={String(student.id)} student={student} subjects={scopedSubjects(student)} />)}</tbody></table></div> : <EmptyState title={students.length ? "No matching students" : "Your workspace starts here"}>{students.length ? "Try another search or reset your filters." : <><p>Import your roster to start supporting your students.</p><button type="button" className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setTab("imports")}><Icon name="upload" size={16} />Import your roster</button></>}</EmptyState>}
+          {filtered.length ? <div className="table-wrap"><table className="data directory-table"><thead><tr><th>Student</th><th>Attendance</th><th>Lowest latest score</th><th>Most classes to recover</th><th>Status</th><th><span className="sr-only">View details</span></th></tr></thead><tbody>{visibleStudents.map(student => <StudentRow key={String(student.id)} student={student} subjects={scopedSubjects(student)} />)}</tbody></table></div> : <EmptyState title={students.length ? "No matching students" : "No students imported yet"}>{students.length ? "Try another search or reset your filters." : <><p>Import your roster to start supporting your students.</p><button type="button" className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => setTab("imports")}><Icon name="upload" size={16} />Import your roster</button></>}</EmptyState>}
           <div className="directory-footer"><span>{filtered.length ? `Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} of ${filtered.length} students` : "No students to display"}</span><div className="pagination"><button type="button" className="btn btn-sm" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</button><span>{currentPage} / {pageCount}</span><button type="button" className="btn btn-sm" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next</button></div></div>
         </Card>
       </> : null}
       {tab === "imports" ? <><Card padded={false}><CardHeader title="Set up your subjects" subtitle="Each subject starts with an 85% attendance and 50% marks threshold." /><div className="card-body stack">{subjects.length ? <div className="chips">{subjects.map(subject => <Badge key={String(subject.id)} tone="accent">{subjectLabel(subject)}</Badge>)}</div> : null}<form onSubmit={addSubject} className="subject-form"><label className="field"><span className="field-label">Subject name</span><input required className="input" value={subjectName} onChange={event => setSubjectName(event.target.value)} placeholder="Data structures" maxLength={120} /></label><label className="field"><span className="field-label">Subject code</span><input className="input" value={subjectCode} onChange={event => setSubjectCode(event.target.value)} placeholder="CS201" maxLength={30} /></label><label className="field"><span className="field-label">Department</span><input className="input" value={department} onChange={event => setDepartment(event.target.value)} placeholder="Computer Science" maxLength={120} /></label><button className="btn btn-primary" disabled={savingSubject || !subjectName.trim()}>{savingSubject ? "Adding…" : "Add subject"}</button></form>{subjectError ? <Alert tone="error" title="Subject could not be added">{subjectError}</Alert> : null}</div></Card><UploadsPanel subjects={subjects} studentsCount={students.length} onImported={onChanged} /></> : null}
-      {tab === "automation" ? <><DemoEmailCard /><AutomationCenter onOpenImports={() => setTab("imports")} hasStudents={students.length > 0} hasSubjects={subjects.length > 0} /></> : null}
+      {tab === "automation" ? <><DemoContactCard kind="voice" /><DemoContactCard kind="email" /><AutomationCenter onOpenImports={() => setTab("imports")} hasStudents={students.length > 0} hasSubjects={subjects.length > 0} /></> : null}
     </div>
   </div>;
 }
 
-function DemoEmailCard() {
+function DemoContactCard({ kind }: { kind: "voice" | "email" }) {
   const [state, setState] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [recipient, setRecipient] = useState("");
+  const isVoice = kind === "voice";
 
-  async function dispatchDemoEmail(event: React.FormEvent<HTMLFormElement>) {
+  async function runDemo(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("pending");
     setMessage(null);
-    const result = await apiPostJson<DemoEmailResponse>("/api/email/demo-send", {});
+    const result = await apiPostJson<DemoResponse>(isVoice ? "/api/voice/demo-call" : "/api/email/demo-send", recipient.trim() ? { [isVoice ? "phone" : "email"]: recipient.trim() } : {});
     if (result.ok) {
       setState("success");
-      setMessage(result.data?.email?.simulated ? "Demo email simulated; nothing was sent. See the activity feed." : "Synthetic demo email accepted for the server-pinned test inbox (delivery not verified).");
+      const simulated = isVoice ? result.data?.call?.simulated : result.data?.email?.simulated;
+      setMessage(simulated ? `${isVoice ? "Call" : "Email"} simulated; nobody was contacted. See the activity feed.` : `${isVoice ? "Call request" : "Email"} accepted by the provider for the approved test contact. ${isVoice ? "Call completion" : "Inbox delivery"} is not verified.`);
     } else {
       setState("error");
-      setMessage(result.error ?? "Could not send the demo email.");
+      setMessage(result.error ?? `Could not run the demo ${isVoice ? "call" : "email"}.`);
     }
   }
 
   return <Card padded={false} className="demo-email-card">
-    <CardHeader title="Preview a demo warning" subtitle="Synthetic 69% attendance example. Simulated unless live testing is enabled on the server." actions={<Badge tone="accent">69% attendance</Badge>} />
+    <CardHeader title={isVoice ? "Try a demo call" : "Try a demo email"} subtitle={isVoice ? "Preview a fixed 69% attendance call; live delivery requires an approved test number." : "Preview a fixed 69% attendance warning; live delivery requires an approved test inbox."} actions={<Badge tone="accent">69% attendance</Badge>} />
     <div className="card-body">
-      <form className="demo-email-form" onSubmit={dispatchDemoEmail}>
-        <button className="btn btn-primary demo-email-button" type="submit" disabled={state === "pending"}>{state === "pending" ? "Running…" : "Run demo warning"}</button>
+      <form className="demo-email-form" onSubmit={runDemo}>
+        <label className="field demo-email-field"><span className="field-label">Approved test {isVoice ? "phone number" : "email address"} (optional)</span><input className="input" type={isVoice ? "tel" : "email"} autoComplete="off" maxLength={isVoice ? 16 : 254} placeholder={isVoice ? "+919876543210" : "you@example.com"} value={recipient} onChange={event => { setRecipient(event.target.value); setMessage(null); setState("idle"); }} /></label>
+        <button className="btn btn-primary demo-email-button" type="submit" disabled={state === "pending"}>{state === "pending" ? "Running…" : isVoice ? "Try demo call" : "Try demo email"}</button>
       </form>
-      <p className="field-hint demo-email-note">One run per UTC day. Live delivery goes only to a consenting server-pinned inbox; never to a typed address or an uploaded student contact.</p>
+      <p className="field-hint demo-email-note">Leave blank to use the server's current mode, or enter the exact consenting test {isVoice ? "number" : "address"} approved on the server. A different contact is rejected. Simulated by default; live mode sends only to the approved contact. One attempt per day, never to uploaded student contacts.</p>
       {message ? <div className={`demo-email-result ${state === "error" ? "error" : "success"}`} role={state === "error" ? "alert" : "status"}>{message}</div> : null}
     </div>
   </Card>;

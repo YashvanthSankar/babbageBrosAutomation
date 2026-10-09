@@ -41,9 +41,15 @@ describe('manual demo email route safety', () => {
   });
   it('live mode only dispatches to the server-pinned recipient', async () => {
     vi.stubEnv('DEMO_LIVE_AUTOMATIONS','true');
-    const response=await POST(request({}));
+    const response=await POST(request({email:'Consenting@Example.com'}));
     expect(response.status).toBe(201);
     expect(dispatch).toHaveBeenCalledWith({to:'consenting@example.com',attendancePercentage:69});
     expect(claim).toHaveBeenCalledWith('finishAggregate',expect.objectContaining({status:'dispatched'}));
+  });
+  it('rejects other addresses even with live mode enabled', async () => {
+    vi.stubEnv('DEMO_LIVE_AUTOMATIONS','true');
+    expect((await POST(request({email:'someone-else@example.com'}))).status).toBe(422);
+    expect(claim).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

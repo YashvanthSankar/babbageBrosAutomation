@@ -240,7 +240,7 @@ function Landing() {
             <div className="welcome-preview-foot"><Icon name="check" size={16} /> A practical next step for every student.</div>
           </div>
           <div className="welcome-features">
-            <div><Icon name="upload" size={20} /><strong>Import once.</strong><p>Upload attendance and marks with a preview before confirming.</p></div>
+            <div><Icon name="upload" size={20} /><strong>Import records.</strong><p>Upload CSV or Excel. Invalid rows are reported; corrected records update existing results.</p></div>
             <div><Icon name="alert" size={20} /><strong>Find who needs help.</strong><p>See attendance concerns and weak or falling results first.</p></div>
             <div><Icon name="clock" size={20} /><strong>Make time to talk.</strong><p>Students can book an available advising appointment.</p></div>
           </div>

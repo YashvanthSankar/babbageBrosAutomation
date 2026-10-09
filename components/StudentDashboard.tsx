@@ -58,11 +58,13 @@ export default function StudentDashboard({ data }: { data: StudentData }) {
               <span className="dot" aria-hidden />
               {summary.atRisk} subject{summary.atRisk === 1 ? "" : "s"} need attention
             </Badge>
-          ) : (
+          ) : subjects.some((subject) => attendancePercent(subject) !== null || subject.latestScore != null) ? (
             <Badge tone="ok">
               <span className="dot" aria-hidden />
-              All subjects on track
+              No current concerns
             </Badge>
+          ) : (
+            <Badge tone="neutral">No results yet</Badge>
           )}
         </div>
       </div>
@@ -79,13 +81,13 @@ export default function StudentDashboard({ data }: { data: StudentData }) {
           label="Recovery classes"
           value={summary.recovery}
           tone={summary.recovery > 0 ? "warn" : "ok"}
-          hint="Classes needed to reach 85%"
+          hint="Consecutive classes needed across subjects"
         />
         <Stat
           label="At-risk subjects"
           value={summary.atRisk}
           tone={summary.atRisk > 0 ? "danger" : "ok"}
-          hint="Below the 85% threshold"
+          hint="Attendance or marks concerns"
         />
       </div>
 
@@ -129,6 +131,7 @@ function SubjectCard({ subject, onBook }: { subject: SubjectStat; onBook: () => 
   const atRisk = isSubjectAtRisk(subject);
   const trend = subjectTrend(subject);
   const recovery = typeof subject.classesToRecover === "number" ? subject.classesToRecover : null;
+  const hasResults = pct !== null || subject.latestScore != null;
 
   return (
     <article className={`subject-card ${atRisk ? "risk" : ""}`}>
@@ -137,7 +140,7 @@ function SubjectCard({ subject, onBook }: { subject: SubjectStat; onBook: () => 
           <div className="subject-name">{subject.name || subjectLabel(subject)}</div>
           <div className="subject-code">{subject.code || `#${subject.id}`}</div>
         </div>
-        {atRisk ? <Badge tone="danger">At risk</Badge> : <Badge tone="ok">On track</Badge>}
+        {atRisk ? <Badge tone="danger">At risk</Badge> : hasResults ? <Badge tone="ok">On track</Badge> : <Badge tone="neutral">No results yet</Badge>}
       </div>
 
       <div className="stack" style={{ gap: 8 }}>
@@ -181,7 +184,9 @@ function SubjectCard({ subject, onBook }: { subject: SubjectStat; onBook: () => 
 
       <div className="row-between">
         <span className="small">
-          {recovery === null ? (
+          {pct === null ? (
+            <span className="muted">No attendance recorded yet</span>
+          ) : recovery === null ? (
             <span className="muted">Recovery data unavailable</span>
           ) : recovery > 0 ? (
             <span style={{ color: "var(--warn)", fontWeight: 600 }}>

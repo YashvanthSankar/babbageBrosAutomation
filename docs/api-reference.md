@@ -98,7 +98,11 @@ Professor-only recent notification and aggregate events, including whether an ac
 
 ### `POST /api/voice/call`
 
-Professor-only JSON `{ "studentId": "...", "subjectId": "..." }`. The service checks risk; public mode records a simulation. Explicit live tests can dispatch only to a server-pinned consenting test number using fixed synthetic context. This route does not accept a phone number. There is no arbitrary-number demo-call endpoint.
+Professor-only JSON `{ "studentId": "...", "subjectId": "..." }`. The service checks risk; public mode records a simulation. Explicit live tests can dispatch only to a server-pinned consenting test number using fixed synthetic context. This route does not accept a phone number.
+
+### `POST /api/voice/demo-call`
+
+Professor-only JSON `{}` or `{ "phone": "+91..." }`. Optional `phone` must exactly match `DEMO_AUTOMATION_PHONE` configured on the server; any other number is rejected before claiming an attempt or contacting the provider. Uses fixed synthetic 69% attendance, simulates by default, and records a durable one-attempt-per-professor-per-UTC-day aggregate event. Live mode requires `DEMO_LIVE_AUTOMATIONS=true`, OmniDimension configuration and a consenting, valid pinned Indian mobile number. Provider acceptance does not prove the call connected. The manual cap is separate from import-triggered call deduplication; this endpoint has not been verified on the VPS.
 
 ### `POST /api/email/demo-send`
 

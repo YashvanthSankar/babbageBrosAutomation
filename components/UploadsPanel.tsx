@@ -30,7 +30,7 @@ const STEPS: {
     needsSubject: false,
     description: "Import the class roster first. Every later upload matches students by roll number.",
     columns: "studentname, rollno, phone, email",
-    hint: "Required columns exactly as above. Student email must end in @iiitdm.ac.in.",
+    hint: "Example headers; aliases are accepted. Roll number, name and valid email are required. Institute email is needed for student sign-in.",
   },
   {
     id: "attendance",

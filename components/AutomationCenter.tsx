@@ -59,6 +59,7 @@ function providerLabel(provider: string): string {
   if (provider === "weekly_summary") return "Weekly cohort summary";
   if (provider === "adviser_alert") return "Faculty adviser alert";
   if (provider === "manual_demo_email") return "Manual demo warning";
+  if (provider === "manual_demo_voice") return "Manual demo call";
   if (provider.includes("omnidim")) return "Voice call · OmniDimension";
   if (provider.includes("resend")) return "Warning email · Resend";
   return provider;
@@ -99,7 +100,7 @@ export default function AutomationCenter({
       apiGet<AutomationStatus>("/api/automation/status"),
       apiGet<{ events: ActivityEvent[] }>("/api/automation/activity"),
     ]);
-    if (statusResult.ok && statusResult.data) setStatus(statusResult.data);
+    setStatus(statusResult.ok ? statusResult.data ?? null : null);
     if (activityResult.ok && activityResult.data) setEvents(activityResult.data.events ?? []);
     const failures = [statusResult, activityResult].filter((result) => !result.ok);
     setError(failures.length ? failures[0].error ?? "Could not load automation status." : null);
@@ -127,9 +128,9 @@ export default function AutomationCenter({
 
       <div className="automation-intro">
         <div>
-          <span className="eyebrow">Provider status &amp; test activity</span>
-          <h2>Automation center</h2>
-          <p>Import a new risk signal to see each downstream action and its real outcome.</p>
+          <span className="eyebrow">Delivery settings and activity</span>
+          <h2>Email and call activity</h2>
+          <p>See import warnings, manual examples and weekly summaries. Check whether each action was simulated or accepted by a provider.</p>
         </div>
         <button className="btn" type="button" onClick={() => void refresh()} disabled={refreshing}>
           {refreshing ? <Spinner /> : null}{refreshing ? "Refreshing…" : "Refresh status"}
@@ -137,13 +138,14 @@ export default function AutomationCenter({
       </div>
 
       <div className="automation-mode-banner">
-        <span className="automation-mode-mark" aria-hidden>{status?.mode === "live" ? "LIVE" : "SAFE"}</span>
+        <span className="automation-mode-mark" aria-hidden>{status?.mode === "live" ? "LIVE" : status?.mode === "simulation" ? "SAFE" : "?"}</span>
         <div>
-          <strong>{status?.mode === "live" ? "Live test delivery is enabled" : "Public demo is in safe simulation mode"}</strong>
+          <strong>{status?.mode === "live" ? "Live test delivery is enabled" : status?.mode === "simulation" ? "Public demo is in safe simulation mode" : "Delivery mode unavailable"}</strong>
           <p>
             {status?.mode === "live"
               ? "Email and calls are routed only to the consented test destinations configured on the server."
-              : "Imports still run risk rules and create activity records. No real email or phone call is sent."}
+              : status?.mode === "simulation" ? "Imports still run risk rules and create activity records. No real email or phone call is sent."
+              : "We could not confirm whether email or calls are enabled. Check the status above or refresh."}
           </p>
         </div>
       </div>
@@ -162,12 +164,13 @@ export default function AutomationCenter({
           provider="Resend"
           loading={loading}
           ready={Boolean(status?.email.liveAllowed)}
-          value={status?.email.liveAllowed ? "Test inbox enabled" : status?.mode === "live" ? "Setup incomplete" : "Simulated"}
+          value={status?.email.liveAllowed ? "Test inbox enabled" : status?.mode === "live" ? "Setup incomplete" : status?.mode === "simulation" ? "Simulated" : "Unknown"}
           detail={status?.email.liveAllowed
               ? "Import a risk result to send one privacy-safe test message today to the pinned inbox."
             : status?.mode === "live"
               ? "Add Resend credentials, a verified sender, and a pinned test inbox."
-              : status?.email.configured
+              : status?.mode !== "simulation" ? "Email delivery status could not be confirmed."
+              : status.email.configured
                 ? "Credentials are present, but sending is intentionally disabled in public demo mode."
                 : "No outbound message is sent. The risk and notification flow is still recorded."}
         />
@@ -176,12 +179,13 @@ export default function AutomationCenter({
           provider="OmniDimension"
           loading={loading}
           ready={Boolean(status?.voice.liveAllowed)}
-          value={status?.voice.liveAllowed ? "Test number enabled" : status?.mode === "live" ? "Setup incomplete" : "Simulated"}
+          value={status?.voice.liveAllowed ? "Test number enabled" : status?.mode === "live" ? "Setup incomplete" : status?.mode === "simulation" ? "Simulated" : "Unknown"}
           detail={status?.voice.liveAllowed
               ? "The first newly-below-threshold transition today calls only the consented test number, using synthetic facts."
             : status?.mode === "live"
               ? "Add OmniDimension credentials and a pinned, consenting test phone."
-              : status?.voice.configured
+              : status?.mode !== "simulation" ? "Call delivery status could not be confirmed."
+              : status.voice.configured
                 ? "Credentials are present, but calling is intentionally disabled in public demo mode."
                 : "No phone call is placed. Threshold transitions appear in the activity log."}
         />
@@ -201,13 +205,13 @@ export default function AutomationCenter({
           loading={loading}
           ready={Boolean(status?.weeklySummary.cronConfigured)}
           value={status?.weeklySummary.cronConfigured ? "Cron secret configured" : "Manual run available"}
-          detail="Aggregate counts only. Weekly runs are recorded once per ISO week; public mode simulates email. Scheduling requires a separate VPS cron job; a configured secret does not prove that job exists."
+          detail="Counts only, no student names. One run per week; public mode simulates email. Automatic scheduling needs a separate VPS job; a configured secret does not prove it exists."
         />
       </div>
 
-       <Card padded={false}><CardHeader title="Weekly support summary" subtitle="Run an idempotent cohort digest; adviser escalation is recorded when a configured adviser and at-risk students exist." />
-         <div className="card-body stack"><button className="btn" type="button" disabled={runningWeekly} onClick={() => void runWeekly()}>{runningWeekly ? "Running…" : "Run this week's summary"}</button>
-           {weeklyMessage ? <p className="small" role="status">{weeklyMessage}</p> : null}</div></Card>
+      <Card padded={false}><CardHeader title="Weekly support summary" subtitle="Run this week's summary once. If any students need support and an adviser is configured, an adviser alert is also recorded." />
+        <div className="card-body stack"><button className="btn" type="button" disabled={runningWeekly} onClick={() => void runWeekly()}>{runningWeekly ? "Running…" : "Run this week's summary"}</button>
+          {weeklyMessage ? <p className="small" role="status">{weeklyMessage}</p> : null}</div></Card>
 
       <Card padded={false}>
         <CardHeader
@@ -229,14 +233,14 @@ export default function AutomationCenter({
             <span className="spacer" />
             <button className="btn btn-primary" onClick={onOpenImports} type="button">Open imports</button>
           </div>
-          <p className="small muted">Sample identity and contact values are synthetic. Public demo mode never calls or emails uploaded contacts. Even with live testing enabled, outbound messages use fixed demo content and are capped at one per provider per UTC day.</p>
+          <p className="small muted">Sample identity and contact values are synthetic. Public demo mode never calls or emails uploaded contacts. Live tests use fixed demo content and approved contacts; daily limits apply separately to import-triggered and manual examples.</p>
         </div>
       </Card>
 
       <Card padded={false}>
         <CardHeader
           title="Recent automation activity"
-          subtitle="The provider is only shown as dispatched when it accepted a live request. Simulations are labeled and are never described as delivered."
+          subtitle="A provider-accepted request does not prove the email arrived or the call connected. Simulations never contact anyone."
           actions={<Badge tone={events.length ? "accent" : "neutral"}>{events.length} events</Badge>}
         />
         {loading ? (
@@ -249,12 +253,12 @@ export default function AutomationCenter({
               const outcome = statusLabel(event.status);
               return (
                 <div className="automation-event" role="listitem" key={event.id}>
-                  <span className={`automation-event-icon ${event.provider.includes("omnidim") ? "voice" : "email"}`} aria-hidden>
-                    {event.provider.includes("omnidim") ? "☎" : "✉"}
+                  <span className={`automation-event-icon ${event.provider.includes("omnidim") || event.provider === "manual_demo_voice" ? "voice" : "email"}`} aria-hidden>
+                    {event.provider.includes("omnidim") || event.provider === "manual_demo_voice" ? "☎" : "✉"}
                   </span>
                   <div className="automation-event-main">
                     <strong>{providerLabel(event.provider)}</strong>
-                    <span>{event.studentName} · {event.subjectName}</span>
+                    <span>{event.provider.startsWith("manual_demo_") ? "Synthetic 69% attendance example" : `${event.studentName} · ${event.subjectName}`}</span>
                   </div>
                   <span className="automation-event-time">{timeLabel(event.sentAt ?? event.createdAt)}</span>
                   <Badge tone={outcome.tone}>{outcome.label}</Badge>
