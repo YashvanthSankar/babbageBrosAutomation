@@ -86,6 +86,9 @@ export const authOptions: NextAuthOptions = {
         ? getProfessorEmail()
         : normalizeEmail(token.email ?? '');
       token.email = email;
+      // Demo credentials can impersonate the professor. Only a completed,
+      // allowlisted Google OAuth sign-in establishes control of this account.
+      if (account) token.verifiedProfessor = account.provider === 'google-professor';
       token.role = isProfessorEmail(email) ? 'admin' : 'student';
       token.studentId = token.role === 'student' ? (await findStudentByEmail(email))?.id ?? null : null;
       if(token.role==='admin') {
@@ -100,6 +103,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role === 'admin' ? 'admin' : 'student';
         session.user.studentId = token.studentId ?? null;
         session.user.hasCalendar = Boolean(token.hasCalendar);
+        session.user.verifiedProfessor = token.role === 'admin' && token.verifiedProfessor === true;
       }
       return session;
     },

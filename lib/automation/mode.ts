@@ -4,6 +4,11 @@ export function liveDemoAutomationsEnabled(): boolean {
   return (process.env.DEMO_LIVE_AUTOMATIONS ?? '').trim().toLowerCase() === 'true';
 }
 
+/** Separate opt-in for manual sends to an entered (not server-pinned) contact. */
+export function manualRecipientDeliveryEnabled(): boolean {
+  return liveDemoAutomationsEnabled() && (process.env.DEMO_LIVE_MANUAL_RECIPIENTS ?? '').trim().toLowerCase() === 'true';
+}
+
 export function demoEmailRecipient(): string {
   return (process.env.DEMO_AUTOMATION_EMAIL ?? '').trim().toLowerCase();
 }

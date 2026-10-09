@@ -46,6 +46,11 @@ export function normalizeRecipient(value: string): string {
   return value.trim().toLowerCase();
 }
 
+/** Resend's sandbox sender is limited to the account owner's inbox. */
+export function resendSandboxSender(from: string): boolean {
+  return /(?:^|<)onboarding@resend\.dev>?\s*$/i.test(from.trim());
+}
+
 function configured(): { apiKey: string; from: string } {
   const apiKey = env('RESEND_API_KEY');
   const from = env('RESEND_FROM_EMAIL');
@@ -65,8 +70,9 @@ function demoBody(attendancePercentage: number): string {
 }
 
 /**
- * Low-level Resend adapter. Caller must enforce server-pinned recipient and
- * Convex-backed daily claim; never invoke directly from a request body.
+ * Low-level Resend adapter. Caller must enforce the selected recipient mode,
+ * verified faculty identity for an entered live address, and a Convex-backed
+ * daily claim; never invoke directly from an unauthenticated request body.
  * The provider response body is never relayed verbatim.
  */
 export async function dispatchDemoAttendanceEmail(input: DemoEmailInput): Promise<{ id: string | null }> {

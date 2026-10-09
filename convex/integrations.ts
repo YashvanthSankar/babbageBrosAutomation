@@ -61,12 +61,36 @@ export const cohortCounts = query({args:{secret:v.string(),professorEmail:v.stri
  return {totalStudents:active.length,atRiskStudents:risky.size,subjects:subjects.length};
 }});
 
-/** Atomic, professor-scoped at-most-once claim, also survives VPS restarts. */
-export const claimAggregate = mutation({args:{secret:v.string(),professorEmail:v.string(),key:v.string(),kind:v.string(),totalStudents:v.number(),atRiskStudents:v.number()},handler:async(ctx,args)=>{
+/** Atomic professor-scoped claim; manual examples allow at most ten attempts per day per mode. */
+export const claimAggregate = mutation({args:{secret:v.string(),professorEmail:v.string(),key:v.string(),legacyKey:v.optional(v.string()),kind:v.string(),totalStudents:v.number(),atRiskStudents:v.number()},handler:async(ctx,args)=>{
  authorize(args.secret);
  const teacher=await ctx.db.query('teachers').withIndex('by_email',q=>q.eq('email',args.professorEmail)).unique();
  if(!teacher)throw new Error('FORBIDDEN');
- const key=`${args.professorEmail}:${args.key}`;
+  // A pre-migration live attempt may have been dispatched or failed without a
+  // receipt. Never allow the new counter to bypass that same-day claim.
+  if(args.legacyKey){
+    const legacy=await ctx.db.query('aggregateEvents').withIndex('by_key',q=>q.eq('key',`${args.professorEmail}:${args.legacyKey}`)).unique();
+    if(legacy&&legacy.status!=='simulated')return null;
+  }
+  // Manual example attempts are bounded in the shared database, not per VPS process.
+  const isManualDemo = args.kind === 'manual_demo_email' || args.kind === 'manual_demo_voice';
+  if(isManualDemo){
+    // Extract day from key (format: "manual-demo-live:2026-10-09" or "manual-voice-live:2026-10-09")
+    const dayMatch = args.key.match(/:\d{4}-\d{2}-\d{2}$/);
+    if(dayMatch){
+      const day = dayMatch[0].substring(1); // Remove leading colon
+      const prefix = args.key.substring(0, args.key.lastIndexOf(':'));
+      // Count existing attempts for this day
+      const allEvents = await ctx.db.query('aggregateEvents').withIndex('by_professor',q=>q.eq('professorEmail',args.professorEmail)).collect();
+      const todayAttempts = allEvents.filter(e=>e.kind===args.kind&&e.key.startsWith(`${args.professorEmail}:${prefix}:${day}:`));
+      if(todayAttempts.length>=10)return null; // Max 10 per day
+      // Create unique key with counter
+      const key=`${args.professorEmail}:${prefix}:${day}:${todayAttempts.length+1}`;
+      return ctx.db.insert('aggregateEvents',{professorEmail:args.professorEmail,key,kind:args.kind,status:'pending',createdAt:Date.now(),totalStudents:args.totalStudents,atRiskStudents:args.atRiskStudents});
+    }
+  }
+  // Original at-most-once logic for weekly summaries and non-manual events.
+  const key=`${args.professorEmail}:${args.key}`;
  const existing=await ctx.db.query('aggregateEvents').withIndex('by_key',q=>q.eq('key',key)).unique();
  if(existing)return null;
  return ctx.db.insert('aggregateEvents',{professorEmail:args.professorEmail,key,kind:args.kind,status:'pending',createdAt:Date.now(),totalStudents:args.totalStudents,atRiskStudents:args.atRiskStudents});

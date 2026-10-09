@@ -95,6 +95,26 @@ test('roster → attendance → marks → risk → weekly claim → booking, inc
   expect(await t.query(api.integrations.bookings, { secret, professorEmail: other.email })).toEqual([]);
 });
 
+test('a legacy simulation cannot block a real send, but a legacy real attempt still blocks it', async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.backend.upsertDemoTeacher, { secret, email: professor, name: 'Demo Professor' });
+  const claim = (kind: string, key: string, legacyKey?: string) =>
+    t.mutation(api.integrations.claimAggregate, { secret, professorEmail: professor, kind, key, totalStudents: 0, atRiskStudents: 0, ...(legacyKey ? { legacyKey } : {}) });
+  const legacyEmail = await t.run(ctx => ctx.db.insert('aggregateEvents', {professorEmail:professor,key:`${professor}:manual-demo:2026-10-09`,kind:'manual_demo_email',status:'pending',createdAt:Date.now(),totalStudents:0,atRiskStudents:0}));
+  expect(legacyEmail).toBeTruthy();
+  expect(await claim('manual_demo_email', 'manual-demo-live:2026-10-09', 'manual-demo:2026-10-09')).toBeNull();
+  await t.mutation(api.integrations.finishAggregate, { secret, professorEmail: professor, id: legacyEmail!, status: 'simulated' });
+  const liveEmail = await claim('manual_demo_email', 'manual-demo-live:2026-10-09', 'manual-demo:2026-10-09');
+  expect(liveEmail).toBeTruthy();
+  for(let n=1;n<10;n++) expect(await claim('manual_demo_email', 'manual-demo-live:2026-10-09', 'manual-demo:2026-10-09')).toBeTruthy();
+  expect(await claim('manual_demo_email', 'manual-demo-live:2026-10-09', 'manual-demo:2026-10-09')).toBeNull();
+
+  const legacyVoice = await t.run(ctx => ctx.db.insert('aggregateEvents', {professorEmail:professor,key:`${professor}:manual-voice:2026-10-09`,kind:'manual_demo_voice',status:'pending',createdAt:Date.now(),totalStudents:0,atRiskStudents:0}));
+  await t.mutation(api.integrations.finishAggregate, { secret, professorEmail: professor, id: legacyVoice!, status: 'dispatched' });
+  expect(await claim('manual_demo_voice', 'manual-voice-live:2026-10-09', 'manual-voice:2026-10-09')).toBeNull();
+  expect(await claim('manual_demo_voice', 'manual-voice-simulation:2026-10-09')).toBeTruthy();
+});
+
 test('invalid and replayed import batches never partially apply', async () => {
   const t = convexTest(schema, modules);
   const { id: teacherId } = await t.mutation(api.backend.upsertDemoTeacher, { secret, email: professor, name: 'Professor' });

@@ -7,6 +7,7 @@ declare module 'next-auth' {
       role: 'admin' | 'student';
       studentId: string | null;
       hasCalendar: boolean;
+      verifiedProfessor: boolean;
     } & DefaultSession['user'];
   }
 
@@ -20,5 +21,6 @@ declare module 'next-auth/jwt' {
     role?: 'admin' | 'student';
     studentId?: string | null;
     hasCalendar?: boolean;
+    verifiedProfessor?: boolean;
   }
 }

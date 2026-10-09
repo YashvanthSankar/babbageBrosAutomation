@@ -58,8 +58,8 @@ function downloadCsv(filename: string, contents: string) {
 function providerLabel(provider: string): string {
   if (provider === "weekly_summary") return "Weekly cohort summary";
   if (provider === "adviser_alert") return "Faculty adviser alert";
-  if (provider === "manual_demo_email") return "Manual demo warning";
-  if (provider === "manual_demo_voice") return "Manual demo call";
+  if (provider === "manual_demo_email") return "Manual attendance email";
+  if (provider === "manual_demo_voice") return "Manual attendance call";
   if (provider.includes("omnidim")) return "Voice call · OmniDimension";
   if (provider.includes("resend")) return "Warning email · Resend";
   return provider;
@@ -140,10 +140,10 @@ export default function AutomationCenter({
       <div className="automation-mode-banner">
         <span className="automation-mode-mark" aria-hidden>{status?.mode === "live" ? "LIVE" : status?.mode === "simulation" ? "SAFE" : "?"}</span>
         <div>
-          <strong>{status?.mode === "live" ? "Live test delivery is enabled" : status?.mode === "simulation" ? "Public demo is in safe simulation mode" : "Delivery mode unavailable"}</strong>
+          <strong>{status?.mode === "live" ? "Live delivery is enabled" : status?.mode === "simulation" ? "Outbound delivery is off" : "Delivery mode unavailable"}</strong>
           <p>
             {status?.mode === "live"
-              ? "Email and calls are routed only to the consented test destinations configured on the server."
+              ? "Import-triggered delivery uses approved server contacts. Manual sends to entered contacts also require separate server approval, professor Google sign-in and recipient consent."
               : status?.mode === "simulation" ? "Imports still run risk rules and create activity records. No real email or phone call is sent."
               : "We could not confirm whether email or calls are enabled. Check the status above or refresh."}
           </p>

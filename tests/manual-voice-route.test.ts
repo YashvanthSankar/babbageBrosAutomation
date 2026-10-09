@@ -10,6 +10,10 @@ vi.mock('@/lib/session', async () => {
       if (value.user.role !== 'admin') throw new ApiError(403, 'FORBIDDEN', 'Admin only');
       return value;
     },
+    requireVerifiedProfessor: (value: { user: { verifiedProfessor?: boolean } }) => {
+      if (value.user.verifiedProfessor !== true) throw new ApiError(403, 'VERIFIED_PROFESSOR_REQUIRED', 'Verify professor account');
+      return value;
+    },
     sessionEmail: () => 'professor@iiitdm.ac.in',
   };
 });
@@ -29,6 +33,7 @@ const request = (body: unknown) => new Request('http://localhost/api/voice/demo-
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv('DEMO_LIVE_AUTOMATIONS', 'false');
+  vi.stubEnv('DEMO_LIVE_MANUAL_RECIPIENTS', 'false');
   vi.stubEnv('DEMO_AUTOMATION_PHONE', '+919876543210');
   vi.stubEnv('OMNIDIM_API_KEY', 'test-key');
   vi.stubEnv('OMNIDIM_AGENT_ID', '1');
@@ -48,11 +53,12 @@ describe('manual demo voice route safety', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it('never claims or calls a number other than the pinned consenting number', async () => {
+  it('simulates another entered number, never calling it in public mode', async () => {
     const response = await POST(request({ phone: '+919000000001' }));
-    expect(response.status).toBe(422);
-    expect(mutation).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ call: { simulated: true, dispatched: false } });
     expect(dispatch).not.toHaveBeenCalled();
+    expect(mutation).toHaveBeenCalledWith('claimAggregate',expect.objectContaining({key:expect.stringMatching(/^manual-voice-simulation:/)}));
   });
 
   it('simulates by default and records an aggregate event', async () => {
@@ -74,6 +80,34 @@ describe('manual demo voice route safety', () => {
     const response = await POST(request({ phone: '+919876543210' }));
     expect(response.status).toBe(201);
     expect(dispatch).toHaveBeenCalledWith({ toNumber: '+919876543210', attendancePercentage: 69 });
+    expect(mutation).toHaveBeenCalledWith('finishAggregate', expect.objectContaining({ status: 'dispatched' }));
+  });
+
+  it('still rejects an entered live number when manual recipient delivery is off', async () => {
+    vi.stubEnv('DEMO_LIVE_AUTOMATIONS', 'true');
+    expect((await POST(request({ phone: '+919000000001' }))).status).toBe(422);
+    expect(mutation).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('requires verified Google faculty and explicit consent for entered live calls', async () => {
+    vi.stubEnv('DEMO_LIVE_AUTOMATIONS', 'true');
+    vi.stubEnv('DEMO_LIVE_MANUAL_RECIPIENTS', 'true');
+    expect((await POST(request({ phone: '+919000000001', consentConfirmed: true }))).status).toBe(403);
+    session.mockResolvedValue({ user: { role: 'admin', verifiedProfessor: true } });
+    expect((await POST(request({ phone: '+919000000001' }))).status).toBe(422);
+    expect(mutation).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('sends to the entered number only after verified faculty consent and claim', async () => {
+    vi.stubEnv('DEMO_LIVE_AUTOMATIONS', 'true');
+    vi.stubEnv('DEMO_LIVE_MANUAL_RECIPIENTS', 'true');
+    session.mockResolvedValue({ user: { role: 'admin', verifiedProfessor: true } });
+    const response = await POST(request({ phone: '+919000000001', consentConfirmed: true }));
+    expect(response.status).toBe(201);
+    expect(dispatch).toHaveBeenCalledWith({ toNumber: '+919000000001', attendancePercentage: 69 });
+    expect(mutation).toHaveBeenCalledWith('claimAggregate', expect.objectContaining({ key: expect.stringMatching(/^manual-voice-live:/), legacyKey: expect.stringMatching(/^manual-voice:/) }));
     expect(mutation).toHaveBeenCalledWith('finishAggregate', expect.objectContaining({ status: 'dispatched' }));
   });
 

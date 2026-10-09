@@ -20,6 +20,13 @@ const navigation = [
 const riskRank: Record<string, number> = { high: 0, warn: 1, ok: 2, unknown: 3 };
 
 type DemoResponse = { email?: { simulated?: boolean }; call?: { simulated?: boolean } };
+type DeliveryStatus = {
+  database: string;
+  mode: string;
+  email: { configured: boolean; sandboxSender?: boolean };
+  voice: { configured: boolean };
+  manualEnteredContacts?: { serverEnabled: boolean; professorVerified: boolean };
+};
 
 function levelFor(subjects: SubjectStat[]): string {
   return subjects.reduce((worst, subject) => (riskRank[subject.riskLevel ?? "unknown"] < riskRank[worst] ? subject.riskLevel ?? "unknown" : worst), "unknown");
@@ -74,11 +81,11 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
   const currentPage = Math.min(page, pageCount);
   const visibleStudents = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const title = tab === "students" ? "Overview" : tab === "imports" ? "Import records" : "Emails, calls and appointments";
-  const subtitle = tab === "students" ? "Who needs support, and why." : tab === "imports" ? "Start with your roster, then add attendance and assessment results." : "Try a safe example or check what happened after an import.";
+  const subtitle = tab === "students" ? "Who needs support, and why." : tab === "imports" ? "Start with your roster, then add attendance and assessment results." : "Send test communications and review delivery activity.";
 
   return <div className="workspace">
     <aside className="workspace-sidebar">
-      <div className="workspace-brand"><span className="workspace-brand-mark"><Icon name="book" size={22} /></span><div><strong>Student Success</strong><span>Babbage Bros</span></div></div>
+      <div className="workspace-brand"><span className="workspace-brand-mark"><Icon name="book" size={22} /></span><div><strong>Student Success</strong><span>IIITDM</span></div></div>
       <div className="workspace-label">Workspace</div>
       <nav className="workspace-nav" aria-label="Faculty navigation">
         {navigation.map(item => <button type="button" key={item.id} className={tab === item.id ? "selected" : ""} aria-current={tab === item.id ? "page" : undefined} onClick={() => setTab(item.id)}><Icon name={item.icon} /><span>{item.label}</span>{item.id === "students" && counts.high > 0 ? <span className="nav-count">{counts.high}</span> : null}</button>)}
@@ -86,7 +93,7 @@ export default function AdminDashboard({ data, onChanged }: { data: AdminData; o
       <div className="sidebar-bottom"><span className="avatar avatar-fallback">{initials(data.professor?.name || "Professor")}</span><div><strong>{data.professor?.name || "Professor"}</strong><span>Faculty workspace</span></div><button type="button" className="sidebar-signout" aria-label="Sign out" onClick={() => signOut()}><Icon name="logout" size={18} /></button></div>
     </aside>
     <div className="workspace-content">
-      <div className="workspace-topbar"><div className="workspace-breadcrumb">Workspace <Icon name="chevron" size={14} /> {navigation.find(item => item.id === tab)?.label}</div><div className="workspace-topbar-right"><span className="demo-access-label">Competition demo</span><CalendarConnect professorEmail={data.professor?.email ?? ""} /><span>{data.professor?.email}</span><button type="button" className="btn btn-sm workspace-mobile-signout" onClick={() => signOut()}>Sign out</button></div></div>
+      <div className="workspace-topbar"><div className="workspace-breadcrumb">Workspace <Icon name="chevron" size={14} /> {navigation.find(item => item.id === tab)?.label}</div><div className="workspace-topbar-right"><CalendarConnect professorEmail={data.professor?.email ?? ""} /><span>{data.professor?.email}</span><button type="button" className="btn btn-sm workspace-mobile-signout" onClick={() => signOut()}>Sign out</button></div></div>
       <header className="overview-header"><div><h1>{title}</h1><p>{subtitle}</p></div><div className="overview-actions"><button type="button" className="btn icon-button" aria-label="Refresh dashboard" onClick={onChanged}><Icon name="refresh" /></button>{tab === "students" ? <button type="button" className="btn btn-primary" onClick={() => setTab("imports")}><Icon name="upload" size={17} />Import records</button> : null}</div></header>
 
       {tab === "students" ? <>
@@ -121,31 +128,52 @@ function DemoContactCard({ kind }: { kind: "voice" | "email" }) {
   const [state, setState] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [recipient, setRecipient] = useState("");
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
+  const [delivery, setDelivery] = useState<DeliveryStatus | null>(null);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
   const isVoice = kind === "voice";
+
+  useEffect(() => {
+    let active = true;
+    apiGet<DeliveryStatus>("/api/automation/status").then(result => {
+      if (!active) return;
+      setDelivery(result.ok ? result.data ?? null : null);
+      setReadinessError(result.ok ? null : result.error ?? "Could not check delivery settings.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  const unavailableReason = readinessError ?? (!delivery ? "Checking delivery settings…"
+    : delivery.mode !== "live" || !delivery.manualEnteredContacts?.serverEnabled ? "Live testing requires operator setup. Ask the deployment team to enable manual delivery."
+    : !delivery.manualEnteredContacts.professorVerified ? "Sign in with the approved professor Google account to send."
+    : !delivery[isVoice ? "voice" : "email"].configured ? `${isVoice ? "Calling" : "Email"} setup is incomplete. Contact the deployment team.`
+    : delivery.database !== "connected" ? "The activity database is unavailable; sending is paused." : null);
 
   async function runDemo(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (unavailableReason || !recipient.trim() || !consentConfirmed) return;
     setState("pending");
     setMessage(null);
-    const result = await apiPostJson<DemoResponse>(isVoice ? "/api/voice/demo-call" : "/api/email/demo-send", recipient.trim() ? { [isVoice ? "phone" : "email"]: recipient.trim() } : {});
+    const result = await apiPostJson<DemoResponse>(isVoice ? "/api/voice/demo-call" : "/api/email/demo-send", { [isVoice ? "phone" : "email"]: recipient.trim(), consentConfirmed });
     if (result.ok) {
-      setState("success");
       const simulated = isVoice ? result.data?.call?.simulated : result.data?.email?.simulated;
-      setMessage(simulated ? `${isVoice ? "Call" : "Email"} simulated; nobody was contacted. See the activity feed.` : `${isVoice ? "Call request" : "Email"} accepted by the provider for the approved test contact. ${isVoice ? "Call completion" : "Inbox delivery"} is not verified.`);
+      setState(simulated ? "error" : "success");
+      setMessage(simulated ? `The server did not send the ${isVoice ? "call" : "email"}. Live delivery is unavailable; check the server settings.` : `${isVoice ? "Call request" : "Email"} accepted by the provider. ${isVoice ? "Call completion" : "Inbox delivery"} has not been verified.`);
     } else {
       setState("error");
-      setMessage(result.error ?? `Could not run the demo ${isVoice ? "call" : "email"}.`);
+      setMessage(result.error ?? `Could not send the ${isVoice ? "call" : "email"}.`);
     }
   }
 
   return <Card padded={false} className="demo-email-card">
-    <CardHeader title={isVoice ? "Try a demo call" : "Try a demo email"} subtitle={isVoice ? "Preview a fixed 69% attendance call; live delivery requires an approved test number." : "Preview a fixed 69% attendance warning; live delivery requires an approved test inbox."} actions={<Badge tone="accent">69% attendance</Badge>} />
+    <CardHeader title={isVoice ? "Test voice call" : "Test email delivery"} subtitle={`Send a test notification to verify ${isVoice ? "calling" : "email"} functionality. Uses sample data only.`} actions={<Badge tone="accent">Test {isVoice ? "call" : "email"}</Badge>} />
     <div className="card-body">
       <form className="demo-email-form" onSubmit={runDemo}>
-        <label className="field demo-email-field"><span className="field-label">Approved test {isVoice ? "phone number" : "email address"} (optional)</span><input className="input" type={isVoice ? "tel" : "email"} autoComplete="off" maxLength={isVoice ? 16 : 254} placeholder={isVoice ? "+919876543210" : "you@example.com"} value={recipient} onChange={event => { setRecipient(event.target.value); setMessage(null); setState("idle"); }} /></label>
-        <button className="btn btn-primary demo-email-button" type="submit" disabled={state === "pending"}>{state === "pending" ? "Running…" : isVoice ? "Try demo call" : "Try demo email"}</button>
+        <label className="field demo-email-field"><span className="field-label">Consenting {isVoice ? "phone number" : "email address"}</span><input className="input" type={isVoice ? "tel" : "email"} required autoComplete="off" maxLength={isVoice ? 16 : 254} placeholder={isVoice ? "+919876543210" : "you@example.com"} value={recipient} onChange={event => { setRecipient(event.target.value); setConsentConfirmed(false); setMessage(null); setState("idle"); }} /></label>
+        <button className="btn btn-primary demo-email-button" type="submit" disabled={Boolean(unavailableReason) || !recipient.trim() || !consentConfirmed || state === "pending"}>{state === "pending" ? "Sending…" : isVoice ? "Place call" : "Send email"}</button>
       </form>
-      <p className="field-hint demo-email-note">Leave blank to use the server's current mode, or enter the exact consenting test {isVoice ? "number" : "address"} approved on the server. A different contact is rejected. Simulated by default; live mode sends only to the approved contact. One attempt per day, never to uploaded student contacts.</p>
+      <label className="field-hint demo-email-note"><input type="checkbox" checked={consentConfirmed} onChange={event => setConsentConfirmed(event.target.checked)} /> I confirm this contact agreed to receive an example {isVoice ? "call" : "email"}.</label>
+      <p className="field-hint demo-email-note">{unavailableReason ?? (isVoice ? "Up to 10 calls per UTC day. Provider acceptance does not confirm an answered call." : delivery?.email.sandboxSender ? "Resend sandbox reaches only its account owner's inbox. Verify a sender domain for other consenting contacts." : "Up to 10 emails per UTC day. Provider acceptance does not confirm inbox delivery.")}</p>
       {message ? <div className={`demo-email-result ${state === "error" ? "error" : "success"}`} role={state === "error" ? "alert" : "status"}>{message}</div> : null}
     </div>
   </Card>;

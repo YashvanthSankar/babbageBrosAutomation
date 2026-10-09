@@ -25,6 +25,15 @@ export function requireAdmin(session: Session | null): Session {
   return authed;
 }
 
+/** Demo-password sessions are not proof of faculty identity. */
+export function requireVerifiedProfessor(session: Session | null): Session {
+  const admin = requireAdmin(session);
+  if (admin.user.verifiedProfessor !== true) {
+    throw new ApiError(403, 'VERIFIED_PROFESSOR_REQUIRED', 'Sign in with the approved professor Google account before sending to an entered contact.');
+  }
+  return admin;
+}
+
 export function requireStudent(session: Session | null): Session {
   const authed = requireSession(session);
   if (authed.user.role !== 'student') {
