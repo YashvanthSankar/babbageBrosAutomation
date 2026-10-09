@@ -6,4 +6,6 @@ Convex production `groovy-sheep-854` was deployed successfully before the VPS re
 
 The versioned PM2 ecosystem mirrors the verified existing VPS settings, including its Node runtime. To roll back, repoint `current` to the retained previous release, reload only `babbagebros-automation` using the ecosystem, verify its health and run `pm2 save`. Do not reload unrelated applications or change Caddy/DNS for this update.
 
-Release verification results will be added after rollout. Authenticated delivery and provider receipt/call completion remain separate from deployment verification.
+Initial rollout verification: public smoke checks pass (including both manual POST routes returning 401 without a session), direct-origin HTTPS health passes with certificate verification, HTTP redirects to HTTPS, and private/source paths return 404. Ordinary demo-professor sign-in works. Both manual cards enable after entering contacts without Google verification or consent; no send button was clicked and no quota was consumed. Browser runtime errors were empty. A stale Calendar dialog still claimed manual sends required verification; its copy was corrected and released as a follow-up.
+
+Mobile inspection at 390px found page-width overflow (647px); this is a separate layout issue, not a send gate, and was not changed during this rollout. Authenticated delivery and provider receipt/call completion remain unverified.

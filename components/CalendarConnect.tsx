@@ -26,15 +26,15 @@ export default function CalendarConnect({ professorEmail }: { professorEmail: st
 
   return <>
     {connection?.connected ? <span className="calendar-connection-status"><Icon name="check" size={15} /> Calendar connected</span> : null}
-    <button className="btn btn-sm" type="button" onClick={() => setOpen(true)}>{connection?.connected ? "Verify for live tests" : "Connect Calendar"}</button>
+    <button className="btn btn-sm" type="button" onClick={() => setOpen(true)}>{connection?.connected ? "Reconnect Calendar" : "Connect Calendar"}</button>
     {open ? <div className="calendar-dialog-backdrop" role="presentation" onClick={() => setOpen(false)}>
       <section className="calendar-dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-dialog-title" onClick={(event) => event.stopPropagation()}>
         <button className="calendar-dialog-close" aria-label="Close Calendar information" type="button" onClick={() => setOpen(false)}>×</button>
         <span className="calendar-dialog-icon"><Icon name="clock" size={22} /></span>
-        <h2 id="calendar-dialog-title">Verify the professor Google account</h2>
+        <h2 id="calendar-dialog-title">Connect the professor Google Calendar</h2>
         <p>Google will ask you to choose the approved account <strong>{connection?.googleAccountEmail || "configured by the organizer"}</strong>. Your workspace stays signed in as <strong>{connection?.professorEmail || professorEmail}</strong>.</p>
         <p>After you approve Calendar access, we’ll show free slots to students and add confirmed appointments to your calendar.</p>
-        <p>Only a verified professor session can send live manual examples to entered consenting contacts, and only when the server separately enables that feature.</p>
+        <p>Calendar connection is optional and is not required for the manual call and email tests.</p>
         {connection?.configured ? <button className="btn btn-primary" type="button" onClick={() => void signIn("google-professor", { callbackUrl: "/" })}>Continue to Google <Icon name="arrow" size={16} /></button>
           : <div className="calendar-setup-note">Calendar needs a Google OAuth Web application client ID, secret, and dedicated Google account email on the server. The project’s API key alone cannot connect a private calendar. In-app booking is available meanwhile.</div>}
       </section>
