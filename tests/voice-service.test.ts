@@ -9,6 +9,7 @@ const { integrationQuery, integrationMutation, dispatchAttendanceCall } = vi.hoi
 vi.mock('@/lib/integrations-store', () => ({ integrationQuery, integrationMutation }));
 vi.mock('@/lib/voice/omnidim', () => ({
   dispatchAttendanceCall,
+  isE164Phone: (phone: string) => /^\+[1-9]\d{1,14}$/.test(phone.trim()),
   isIndianE164Phone: (phone: string) => /^\+91\d{10}$/.test(phone),
 }));
 
@@ -71,5 +72,25 @@ describe('public-demo voice safety', () => {
     await expect(dispatchAtRiskAttendanceCall('student-1', 'subject-1', 'professor@iiitdm.ac.in'))
       .resolves.toMatchObject({ dispatched: false, status: 'not_at_risk' });
     expect(dispatchAttendanceCall).not.toHaveBeenCalled();
+  });
+});
+
+describe('E.164 phone validation', () => {
+  it('accepts international E.164 numbers through the adapter helper', async () => {
+    const { isE164Phone } = await vi.importActual<typeof import('@/lib/voice/omnidim')>('@/lib/voice/omnidim');
+    expect(isE164Phone('+14155550100')).toBe(true);
+    expect(isE164Phone(' +919876543210 ')).toBe(true);
+    expect(isE164Phone('+442079460958')).toBe(true);
+    expect(isE164Phone('+91 98765 43210')).toBe(false);
+    expect(isE164Phone('919876543210')).toBe(false);
+    expect(isE164Phone('+0123456789')).toBe(false);
+    expect(isE164Phone('')).toBe(false);
+  });
+
+  it('keeps the India-only helper for import automation pinned numbers', async () => {
+    const { isIndianE164Phone } = await vi.importActual<typeof import('@/lib/voice/omnidim')>('@/lib/voice/omnidim');
+    expect(isIndianE164Phone('+919876543210')).toBe(true);
+    expect(isIndianE164Phone('+14155550100')).toBe(false);
+    expect(isIndianE164Phone('+915876543210')).toBe(false);
   });
 });

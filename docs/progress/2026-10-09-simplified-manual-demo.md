@@ -1,0 +1,9 @@
+# Simplified manual demo delivery · 2026-10-09
+
+At the user's explicit request, the professor dashboard manual call/email cards now accept an entered contact and attempt live dispatch without server opt-in, Google verification, consent checkbox, pinned recipient, provider-readiness UI gating, or sandbox preflight. Ordinary professor-session authorization is retained. International E.164 phone numbers are accepted; email syntax and required contacts are validated before claiming.
+
+The existing Convex live counters cap attempts at ten per provider per professor per UTC day, independent of destination. Failed/uncertain attempts consume an allowance. Legacy live-claim migration safeguards remain. No real student data is used: content is fixed synthetic 69% attendance, and destinations are not stored in aggregate activity. Import-triggered actions, weekly summaries, and adviser escalation retain their separate simulation/pinned-recipient safeguards.
+
+Removing application preflights cannot remove provider requirements. Missing credentials return errors; Resend still imposes sandbox/domain restrictions and OmniDimension controls destination availability. Provider acceptance is not inbox receipt or an answered call. Public demo-password access is not production identity verification; these relaxed manual controls must not be represented as production student communication or consent management.
+
+This note supersedes the manual gate descriptions in earlier progress notes. No provider send or VPS/Convex deployment was performed for this change. Local verification: all 71 tests across 13 suites pass, including entered-contact live dispatch with disabled flags, ordinary professor authorization, failed-attempt accounting, independent provider quotas and next-day reset. Production build, typecheck and diff whitespace checks pass. Provider HTTP calls in tests are mocked; real receipt/call completion remains unverified.

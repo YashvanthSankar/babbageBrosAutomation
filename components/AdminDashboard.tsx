@@ -19,14 +19,7 @@ const navigation = [
 ];
 const riskRank: Record<string, number> = { high: 0, warn: 1, ok: 2, unknown: 3 };
 
-type DemoResponse = { email?: { simulated?: boolean }; call?: { simulated?: boolean } };
-type DeliveryStatus = {
-  database: string;
-  mode: string;
-  email: { configured: boolean; sandboxSender?: boolean };
-  voice: { configured: boolean };
-  manualEnteredContacts?: { serverEnabled: boolean; professorVerified: boolean };
-};
+type DemoResponse = { email?: { dispatched?: boolean; simulated?: boolean }; call?: { dispatched?: boolean; simulated?: boolean } };
 
 function levelFor(subjects: SubjectStat[]): string {
   return subjects.reduce((worst, subject) => (riskRank[subject.riskLevel ?? "unknown"] < riskRank[worst] ? subject.riskLevel ?? "unknown" : worst), "unknown");
@@ -128,37 +121,19 @@ function DemoContactCard({ kind }: { kind: "voice" | "email" }) {
   const [state, setState] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [recipient, setRecipient] = useState("");
-  const [consentConfirmed, setConsentConfirmed] = useState(false);
-  const [delivery, setDelivery] = useState<DeliveryStatus | null>(null);
-  const [readinessError, setReadinessError] = useState<string | null>(null);
   const isVoice = kind === "voice";
-
-  useEffect(() => {
-    let active = true;
-    apiGet<DeliveryStatus>("/api/automation/status").then(result => {
-      if (!active) return;
-      setDelivery(result.ok ? result.data ?? null : null);
-      setReadinessError(result.ok ? null : result.error ?? "Could not check delivery settings.");
-    });
-    return () => { active = false; };
-  }, []);
-
-  const unavailableReason = readinessError ?? (!delivery ? "Checking delivery settings…"
-    : delivery.mode !== "live" || !delivery.manualEnteredContacts?.serverEnabled ? "Live testing requires operator setup. Ask the deployment team to enable manual delivery."
-    : !delivery.manualEnteredContacts.professorVerified ? "Sign in with the approved professor Google account to send."
-    : !delivery[isVoice ? "voice" : "email"].configured ? `${isVoice ? "Calling" : "Email"} setup is incomplete. Contact the deployment team.`
-    : delivery.database !== "connected" ? "The activity database is unavailable; sending is paused." : null);
 
   async function runDemo(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (unavailableReason || !recipient.trim() || !consentConfirmed) return;
+    if (!recipient.trim() || state === "pending") return;
     setState("pending");
     setMessage(null);
-    const result = await apiPostJson<DemoResponse>(isVoice ? "/api/voice/demo-call" : "/api/email/demo-send", { [isVoice ? "phone" : "email"]: recipient.trim(), consentConfirmed });
+    const result = await apiPostJson<DemoResponse>(isVoice ? "/api/voice/demo-call" : "/api/email/demo-send", { [isVoice ? "phone" : "email"]: recipient.trim() });
     if (result.ok) {
-      const simulated = isVoice ? result.data?.call?.simulated : result.data?.email?.simulated;
-      setState(simulated ? "error" : "success");
-      setMessage(simulated ? `The server did not send the ${isVoice ? "call" : "email"}. Live delivery is unavailable; check the server settings.` : `${isVoice ? "Call request" : "Email"} accepted by the provider. ${isVoice ? "Call completion" : "Inbox delivery"} has not been verified.`);
+      const action = isVoice ? result.data?.call : result.data?.email;
+      const accepted = action?.dispatched === true && action.simulated !== true;
+      setState(accepted ? "success" : "error");
+      setMessage(accepted ? `${isVoice ? "Call request" : "Email"} accepted by the provider. ${isVoice ? "Call completion" : "Inbox delivery"} has not been verified.` : `The server did not confirm sending the ${isVoice ? "call" : "email"}. Check the server settings.`);
     } else {
       setState("error");
       setMessage(result.error ?? `Could not send the ${isVoice ? "call" : "email"}.`);
@@ -169,11 +144,10 @@ function DemoContactCard({ kind }: { kind: "voice" | "email" }) {
     <CardHeader title={isVoice ? "Test voice call" : "Test email delivery"} subtitle={`Send a test notification to verify ${isVoice ? "calling" : "email"} functionality. Uses sample data only.`} actions={<Badge tone="accent">Test {isVoice ? "call" : "email"}</Badge>} />
     <div className="card-body">
       <form className="demo-email-form" onSubmit={runDemo}>
-        <label className="field demo-email-field"><span className="field-label">Consenting {isVoice ? "phone number" : "email address"}</span><input className="input" type={isVoice ? "tel" : "email"} required autoComplete="off" maxLength={isVoice ? 16 : 254} placeholder={isVoice ? "+919876543210" : "you@example.com"} value={recipient} onChange={event => { setRecipient(event.target.value); setConsentConfirmed(false); setMessage(null); setState("idle"); }} /></label>
-        <button className="btn btn-primary demo-email-button" type="submit" disabled={Boolean(unavailableReason) || !recipient.trim() || !consentConfirmed || state === "pending"}>{state === "pending" ? "Sending…" : isVoice ? "Place call" : "Send email"}</button>
+        <label className="field demo-email-field"><span className="field-label">{isVoice ? "Phone number (with country code)" : "Email address"}</span><input className="input" type={isVoice ? "tel" : "email"} required autoComplete="off" maxLength={isVoice ? 16 : 254} placeholder={isVoice ? "+14155552671" : "you@example.com"} value={recipient} disabled={state === "pending"} onChange={event => { setRecipient(event.target.value); setMessage(null); setState("idle"); }} /></label>
+        <button className="btn btn-primary demo-email-button" type="submit" disabled={!recipient.trim() || state === "pending"}>{state === "pending" ? "Sending…" : isVoice ? "Place call" : "Send email"}</button>
       </form>
-      <label className="field-hint demo-email-note"><input type="checkbox" checked={consentConfirmed} onChange={event => setConsentConfirmed(event.target.checked)} /> I confirm this contact agreed to receive an example {isVoice ? "call" : "email"}.</label>
-      <p className="field-hint demo-email-note">{unavailableReason ?? (isVoice ? "Up to 10 calls per UTC day. Provider acceptance does not confirm an answered call." : delivery?.email.sandboxSender ? "Resend sandbox reaches only its account owner's inbox. Verify a sender domain for other consenting contacts." : "Up to 10 emails per UTC day. Provider acceptance does not confirm inbox delivery.")}</p>
+      <p className="field-hint demo-email-note">{isVoice ? "Up to 10 call attempts per UTC day. Provider acceptance does not confirm an answered call." : "Up to 10 email attempts per UTC day. Provider acceptance does not confirm inbox delivery."}</p>
       {message ? <div className={`demo-email-result ${state === "error" ? "error" : "success"}`} role={state === "error" ? "alert" : "status"}>{message}</div> : null}
     </div>
   </Card>;

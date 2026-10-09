@@ -31,7 +31,13 @@ function env(name: string): string {
   return (process.env[name] ?? '').trim();
 }
 
-/** India mobile number in E.164: +91 followed by a 10-digit 6–9 prefix number. */
+/** International E.164 number: a leading + then 2–15 digits with no leading zero. */
+export function isE164Phone(value: string): boolean {
+  return /^\+[1-9]\d{1,14}$/.test(value.trim());
+}
+
+/** India mobile number in E.164: +91 followed by a 10-digit 6–9 prefix number.
+ * Import automation keeps this stricter check for pinned demo calls. */
 export function isIndianE164Phone(value: string): boolean {
   return /^\+91[6-9]\d{9}$/.test(value.trim());
 }
@@ -49,8 +55,8 @@ function configured(): { apiKey: string; agentId: number; fromNumberId: number }
 /** Dispatch one call. The provider response deliberately is not logged verbatim. */
 export async function dispatchAttendanceCall(input: OmniDimensionDispatchInput): Promise<void> {
   const toNumber = input.toNumber.trim();
-  if (!isIndianE164Phone(toNumber)) {
-    throw new OmniDimensionDispatchError(422, 'The student phone number must be a valid Indian E.164 mobile number.');
+  if (!isE164Phone(toNumber)) {
+    throw new OmniDimensionDispatchError(422, 'The phone number must be a valid international E.164 number (for example +14155552671).');
   }
   if (!Number.isFinite(input.attendancePercentage) || input.attendancePercentage < 0 || input.attendancePercentage > 100) {
     throw new OmniDimensionDispatchError(422, 'Attendance percentage must be between 0 and 100.');

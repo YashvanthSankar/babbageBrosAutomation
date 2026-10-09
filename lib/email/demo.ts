@@ -70,9 +70,10 @@ function demoBody(attendancePercentage: number): string {
 }
 
 /**
- * Low-level Resend adapter. Caller must enforce the selected recipient mode,
- * verified faculty identity for an entered live address, and a Convex-backed
- * daily claim; never invoke directly from an unauthenticated request body.
+ * Low-level Resend adapter. Callers must run it only after authenticating an
+ * admin professor and taking a Convex-backed daily claim for the recipient;
+ * never invoke it directly from an unauthenticated request body. Credential
+ * requirements are enforced here and cannot be bypassed by the caller.
  * The provider response body is never relayed verbatim.
  */
 export async function dispatchDemoAttendanceEmail(input: DemoEmailInput): Promise<{ id: string | null }> {

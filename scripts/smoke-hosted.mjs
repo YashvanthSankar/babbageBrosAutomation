@@ -12,6 +12,7 @@ const checks = [
   ['POST', '/api/automation/weekly', [401]],
   ['POST', '/api/automation/weekly/cron', [401, 503]],
   ['POST', '/api/email/demo-send', [401]],
+  ['POST', '/api/voice/demo-call', [401]],
 ];
 let failures = 0;
 for (const [method, path, expected] of checks) {

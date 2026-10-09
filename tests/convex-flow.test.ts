@@ -115,6 +115,23 @@ test('a legacy simulation cannot block a real send, but a legacy real attempt st
   expect(await claim('manual_demo_voice', 'manual-voice-simulation:2026-10-09')).toBeTruthy();
 });
 
+test('manual provider quotas are independent, count failures, and reset by UTC day', async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.backend.upsertDemoTeacher, { secret, email: professor, name: 'Demo Professor' });
+  const claim = (kind: string, prefix: string, day: string) =>
+    t.mutation(api.integrations.claimAggregate, { secret, professorEmail: professor, kind,
+      key: `${prefix}:${day}`, totalStudents: 0, atRiskStudents: 0 });
+  for (const [kind, prefix] of [['manual_demo_email', 'manual-demo-live'], ['manual_demo_voice', 'manual-voice-live']]) {
+    for (let n = 0; n < 10; n++) {
+      const id = await claim(kind, prefix, '2026-10-09');
+      expect(id).toBeTruthy();
+      await t.mutation(api.integrations.finishAggregate, { secret, professorEmail: professor, id: id!, status: 'failed' });
+    }
+    expect(await claim(kind, prefix, '2026-10-09')).toBeNull();
+    expect(await claim(kind, prefix, '2026-10-10')).toBeTruthy();
+  }
+});
+
 test('invalid and replayed import batches never partially apply', async () => {
   const t = convexTest(schema, modules);
   const { id: teacherId } = await t.mutation(api.backend.upsertDemoTeacher, { secret, email: professor, name: 'Professor' });

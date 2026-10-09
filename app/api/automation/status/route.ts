@@ -1,7 +1,7 @@
 import {handleRoute,json} from '@/lib/api';
 import {getSession,requireAdmin} from '@/lib/session';
 import {convexApi,convexClient,convexSecret} from '@/lib/convex';
-import {demoEmailRecipient,demoVoiceRecipient,liveDemoAutomationsEnabled,manualRecipientDeliveryEnabled} from '@/lib/automation/mode';
+import {demoEmailRecipient,demoVoiceRecipient,liveDemoAutomationsEnabled} from '@/lib/automation/mode';
 import {isIndianE164Phone} from '@/lib/voice/omnidim';
 import {resendSandboxSender} from '@/lib/email/demo';
 import {weeklyReadiness} from '@/lib/email/weekly';
@@ -27,7 +27,7 @@ export async function GET(){
       mode:liveDemo?'live':'simulation',
        email:{configured:emailConfigured,testRecipientConfigured:emailTestRecipientConfigured,liveAllowed:liveDemo&&emailConfigured&&emailTestRecipientConfigured,sandboxSender:resendSandboxSender(process.env.RESEND_FROM_EMAIL??'')},
       voice:{configured:voiceConfigured,testRecipientConfigured:voiceTestRecipientConfigured,liveAllowed:liveDemo&&voiceConfigured&&voiceTestRecipientConfigured},
-      manualEnteredContacts:{serverEnabled:manualRecipientDeliveryEnabled(),professorVerified:session.user.verifiedProfessor === true},
+      manualEnteredContacts:{serverEnabled:true,verificationRequired:false,consentRequired:false},
       calendar:{connected:calendarConfigured},
        weeklySummary:weeklyReadiness(),
     });
